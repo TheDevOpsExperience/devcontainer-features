@@ -1,0 +1,17 @@
+{
+  "test": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "core": {}
+    }
+  },
+  "idle_stop": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "core": {
+        "idle_stop": true,
+        "idle_grace": "45"
+      }
+    }
+  }
+}

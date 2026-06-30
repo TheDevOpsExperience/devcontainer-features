@@ -1,0 +1,119 @@
+name: "Build base image"
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "image/**"
+      - ".github/workflows/build-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push the tde-base-v<version> release tag after build
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: tde-base
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # need tags to validate tde-base-v<version>
+
+      - name: Lowercase owner for GHCR path
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Read NODE_VERSION from Dockerfile
+        id: node
+        run: |
+          ver=$(sed -n 's/^ARG NODE_VERSION=//p' image/Dockerfile | head -1)
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Read IMAGE_VERSION from Dockerfile
+        id: imgver
+        run: |
+          ver=$(sed -n 's/^ARG IMAGE_VERSION=//p' image/Dockerfile | head -1)
+          [ -n "$ver" ] || { echo "ARG IMAGE_VERSION not found in image/Dockerfile" >&2; exit 1; }
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "minor=${ver%.*}" >> "$GITHUB_OUTPUT"   # major.minor
+
+      # Fail fast — before the multi-arch build — if this version was already
+      # released on a DIFFERENT commit (i.e. image changed but IMAGE_VERSION
+      # wasn't bumped). A tag already on HEAD is an idempotent rerun → allowed.
+      - name: Validate version tag
+        run: |
+          set -euo pipefail
+          tag="tde-base-v${{ steps.imgver.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            tagged_sha=$(git rev-list -n1 "$tag")
+            if [ "$tagged_sha" = "$GITHUB_SHA" ]; then
+              echo "$tag already on this commit — rerun, proceeding."
+            else
+              echo "::error::$tag already exists on $tagged_sha. Bump IMAGE_VERSION in image/Dockerfile." >&2
+              exit 1
+            fi
+          else
+            echo "$tag is new — will tag after a successful push."
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.owner.outputs.owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=node${{ steps.node.outputs.version }}
+            type=raw,value=node${{ steps.node.outputs.version }}-bookworm
+            type=sha,format=short
+            type=raw,value=${{ steps.imgver.outputs.version }}
+            type=raw,value=${{ steps.imgver.outputs.minor }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./image
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Immutable git record of the released image version, matching the
+      # <feature>-v<version> scheme. Skips if already on this commit (rerun);
+      # a collision on a different commit was already rejected above. Only on
+      # the default branch — PRs/dispatch on other refs build but don't tag.
+      - name: Tag image release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          tag="tde-base-v${{ steps.imgver.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "tag exists, skipping: $tag"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "tde-base ${{ steps.imgver.outputs.version }}"
+          git push origin "$tag"
+          echo "tagged: $tag"

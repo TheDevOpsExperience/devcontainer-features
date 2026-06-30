@@ -1,0 +1,64 @@
+{
+  "id": "core",
+  "version": "1.0.0",
+  "name": "Core Development Tools",
+  "description": "Baseline tools (zsh, git, curl, jq, gpg, sudo) and devcontainer lifecycle runners. Works on any apt-based image.",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/core",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "postCreateCommand": "/usr/local/share/devcontainer/core/create.sh",
+  "postStartCommand": "/usr/local/share/devcontainer/core/setup.sh",
+  "postAttachCommand": "/usr/local/share/devcontainer/core/attach.sh ${containerWorkspaceFolder}",
+  "options": {
+    "idle_stop": {
+      "type": "boolean",
+      "default": false,
+      "description": "Stop the container when VS Code has been disconnected for `idle_grace` seconds, so nothing runs unattended. Covers both window-close and CLI-launched (`devcontainer up`) containers, unlike devcontainer.json `shutdownAction`. Default off."
+    },
+    "idle_grace": {
+      "type": "string",
+      "default": "120",
+      "description": "Grace period in seconds before idle-stop halts the container after VS Code disconnects. Only applies when `idle_stop` is enabled."
+    }
+  },
+  "containerEnv": {
+    "DEVCONTAINER": "true",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "SHELL": "/bin/zsh",
+    "EDITOR": "nano",
+    "VISUAL": "nano"
+  },
+  "mounts": [
+    {
+      "source": "commandhistory-${localWorkspaceFolderBasename}",
+      "target": "/dc-volumes/commandhistory",
+      "type": "volume"
+    },
+    {
+      "source": "config-${localWorkspaceFolderBasename}",
+      "target": "/dc-volumes/config",
+      "type": "volume"
+    }
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "bash",
+            "icon": "terminal-bash"
+          },
+          "zsh": {
+            "path": "zsh"
+          }
+        }
+      }
+    }
+  }
+}

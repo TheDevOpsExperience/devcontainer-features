@@ -1,0 +1,214 @@
+name: "Release Features"
+
+on:
+  workflow_dispatch:
+  # No path filter: publish is registry-gated (only versions missing from GHCR
+  # get published), so every push to main re-evaluates and self-heals a pending
+  # publish — including test-only or rerun commits after an earlier failure.
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write   # push per-feature release tags after publish
+  packages: write
+
+# Some pinned actions (docker/login-action@v3, devcontainers/action@v1) still
+# ship Node 20 entry points. Force Node 24 until they publish Node 24 releases.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      features: ${{ steps.set.outputs.features }}
+      publish_features: ${{ steps.set.outputs.publish_features }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine test + publish sets
+        id: set
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          base="${{ github.event.before }}"
+
+          # ── Test set: features whose files changed (broad). Manual run or no
+          # diff base → test everything; a core/shared-test/workflow change
+          # retests everything.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             || [ -z "$base" ] \
+             || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            test_feats=$(ls src)
+          else
+            changed=$(git diff --name-only "$base" "${{ github.sha }}")
+            if echo "$changed" | grep -qE '^(src/core/|test/_|\.github/workflows/)'; then
+              test_feats=$(ls src)
+            else
+              test_feats=$(echo "$changed" | grep -oE '^(src|test)/[^/]+/' | cut -d/ -f2 | sort -u)
+            fi
+          fi
+
+          # ── Publish set: a feature whose CURRENT version isn't already in GHCR.
+          # Compared against the registry (not a commit range), so a version bump
+          # publishes regardless of when/how it landed, and an already-published
+          # x.y.z is never overwritten. Tests-only commits → version unchanged →
+          # already published → skipped.
+          owner_lc=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          ns="${owner_lc}/devcontainer-features"
+          published() { # $1=feature $2=version → 0 if already in registry
+            local f="$1" ver="$2" tok code
+            tok=$(curl -fsSL -u "x:${GITHUB_TOKEN}" \
+              "https://ghcr.io/token?service=ghcr.io&scope=repository:${ns}/${f}:pull" \
+              | jq -r '.token // empty') || return 1
+            [ -n "$tok" ] || return 1
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X GET \
+              -H "Authorization: Bearer $tok" \
+              -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/${ns}/${f}/manifests/${ver}")
+            case "$code" in
+              200) return 0 ;;                       # exists → already published
+              401|404) return 1 ;;                   # not found → publish
+              *) echo "::warning::registry HTTP $code for ${f}:${ver} — skipping to avoid overwrite" >&2; return 0 ;;
+            esac
+          }
+          publish_feats=""
+          for f in $(ls src); do
+            [ -f "src/$f/devcontainer-feature.json" ] || continue
+            ver=$(jq -r '.version' "src/$f/devcontainer-feature.json")
+            if published "$f" "$ver"; then
+              echo "skip (already published): $f@$ver"
+            else
+              echo "publish (new version): $f@$ver"
+              publish_feats="$publish_feats $f"
+            fi
+          done
+
+          to_json() { for f in $1; do [ -d "src/$f" ] && echo "$f"; done | jq -R . | jq -cs .; }
+          test_json=$(to_json "$test_feats")
+          publish_json=$(to_json "$publish_feats")
+          echo "features=$test_json" >> "$GITHUB_OUTPUT"
+          echo "publish_features=$publish_json" >> "$GITHUB_OUTPUT"
+          echo "Testing: $test_json"
+          echo "Publishing: $publish_json"
+
+  test:
+    needs: detect
+    if: needs.detect.outputs.features != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: ${{ fromJSON(needs.detect.outputs.features) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install devcontainer CLI
+        run: npm install -g @devcontainers/cli
+
+      - name: Test feature '${{ matrix.feature }}'
+        run: devcontainer features test -f ${{ matrix.feature }} --skip-autogenerated --project-folder .
+
+  # Single gate: passes when the matrix succeeded or was legitimately skipped,
+  # fails on any feature-test failure. Publish depends on this.
+  tests-passed:
+    needs: [detect, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify test result
+        run: |
+          detect="${{ needs.detect.result }}"
+          result="${{ needs.test.result }}"
+          # detect must have succeeded, else 'test' was skipped without coverage.
+          if [ "$detect" != "success" ]; then
+            echo "detect job did not succeed (result=$detect)." >&2
+            exit 1
+          fi
+          if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+            echo "Feature tests failed (result=$result)." >&2
+            exit 1
+          fi
+          echo "OK (detect=$detect, test=$result)."
+
+  # Publish ONLY the changed + version-bumped features (computed in `detect`).
+  # devcontainers/action publishes everything under base-path-to-features, so we
+  # stage the selected features into a temp dir and point the action there.
+  publish:
+    needs: [detect, tests-passed]
+    if: needs.detect.outputs.publish_features != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Stage features to publish
+        run: |
+          set -euo pipefail
+          mkdir -p to-publish
+          for f in $(echo '${{ needs.detect.outputs.publish_features }}' | jq -r '.[]'); do
+            echo "Staging $f"
+            cp -r "src/$f" "to-publish/$f"
+          done
+
+      # The Firewall Monitor extension ships INSIDE the feature artifact: build
+      # the .vsix and drop it into the STAGED feature dir so devcontainers/action
+      # tars it into the OCI image. install.sh then copies it out at build time.
+      # The extension is 1:1 coupled to the feature — no standalone release/tag
+      # and no version sync to maintain.
+      - name: Bundle firewall extension into feature
+        if: contains(fromJSON(needs.detect.outputs.publish_features), 'firewall')
+        run: |
+          set -euo pipefail
+          npm i -g @vscode/vsce
+          cd to-publish/firewall/extension
+          vsce package --allow-missing-repository --skip-license
+          # Strip the extension SOURCE from the published artifact — only the
+          # built .vsix needs to ship (install.sh copies it; the .vsix already
+          # bundles extension.js). Operates on the staged copy, so repo source
+          # is untouched.
+          find . -maxdepth 1 -type f ! -name '*.vsix' -delete
+          ls -la
+
+      - name: Publish features
+        uses: devcontainers/action@v1
+        with:
+          publish-features: "true"
+          base-path-to-features: "./to-publish"
+          generate-docs: "true"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tag the publish SHA per feature so init scripts can pin to an exact
+      # release. OCI versions cover the feature artifact; the git tag also pins
+      # the host-side hooks/ and devcontainer.json template, which live in the
+      # repo (not the OCI image). Tag name: <feature>-v<version> (dash, not
+      # slash, so raw.githubusercontent.com ref resolution is unambiguous). Only
+      # tags what actually published (publish_features); skips an existing tag, matching
+      # the registry-gated self-heal model — safe on reruns.
+      - name: Tag published features
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in $(echo '${{ needs.detect.outputs.publish_features }}' | jq -r '.[]'); do
+            ver=$(jq -r '.version' "src/$f/devcontainer-feature.json")
+            tag="$f-v$ver"
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "tag exists, skipping: $tag"
+              continue
+            fi
+            git tag -a "$tag" -m "$f $ver"
+            git push origin "$tag"
+            echo "tagged: $tag"
+          done
