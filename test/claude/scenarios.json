@@ -1,0 +1,12 @@
+{
+  "test": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "core": {},
+      "claude": {}
+    },
+    "overrideFeatureInstallOrder": [
+      "./core"
+    ]
+  }
+}

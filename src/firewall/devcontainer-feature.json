@@ -1,0 +1,23 @@
+{
+  "id": "firewall",
+  "version": "1.0.0",
+  "name": "Firewall",
+  "description": "iptables/ipset allowlist firewall with domain-based rules and DNS capture for domain discovery",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/firewall",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "install_extension": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install the Firewall Monitor VS Code extension (allowlist view, session-domain revoke, runtime allow-event toasts). The .vsix is bundled in the feature image and copied at build time; failure is non-fatal."
+    }
+  },
+  "capAdd": [
+    "NET_ADMIN",
+    "NET_RAW"
+  ],
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ],
+  "postStartCommand": "/usr/local/share/devcontainer/firewall/setup.sh"
+}

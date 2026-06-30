@@ -1,0 +1,13 @@
+# Devcontainer artifacts generated at build/run time — never commit.
+# Paths are relative to this .devcontainer/ directory (copy this file to
+# .devcontainer/.gitignore in your project).
+
+# Scratch dir holding the secret env file (devcontainer.env, chmod 600), the
+# generated SSH config, and copied public keys. Its path is set by
+# INIT_CONFIG_DIR in hooks/on-init.sh; core's host on-init creates it and the
+# container deletes it on start — but never commit it. Keep this in sync if you
+# change INIT_CONFIG_DIR.
+.init/
+
+# Firewall DNS capture log (written by 'sudo capture-dns.sh').
+.firewall/dns-domains.log

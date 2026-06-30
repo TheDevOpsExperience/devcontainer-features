@@ -9,7 +9,7 @@ on:
     branches: ["main"]
 
 permissions:
-  contents: write   # push per-feature release tags after publish
+  contents: write   # devcontainers/action tags each published feature (feature_<id>_<version>)
   packages: write
 
 # Some pinned actions (docker/login-action@v3, devcontainers/action@v1) still
@@ -180,6 +180,12 @@ jobs:
           find . -maxdepth 1 -type f ! -name '*.vsix' -delete
           ls -la
 
+      # devcontainers/action auto-creates a git tag per published feature
+      # (feature_<id>_<version>, via addRepoTagForPublishedTag — unconditional,
+      # no opt-out), so init scripts can pin host hooks to an exact release. It
+      # tags via the GitHub API, which is why this workflow needs contents:write
+      # (under contents:read tagging fails with a silent warning). No custom tag
+      # step — that would just duplicate the action's tag under a second name.
       - name: Publish features
         uses: devcontainers/action@v1
         with:
@@ -188,27 +194,3 @@ jobs:
           generate-docs: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Tag the publish SHA per feature so init scripts can pin to an exact
-      # release. OCI versions cover the feature artifact; the git tag also pins
-      # the host-side hooks/ and devcontainer.json template, which live in the
-      # repo (not the OCI image). Tag name: <feature>-v<version> (dash, not
-      # slash, so raw.githubusercontent.com ref resolution is unambiguous). Only
-      # tags what actually published (publish_features); skips an existing tag, matching
-      # the registry-gated self-heal model — safe on reruns.
-      - name: Tag published features
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in $(echo '${{ needs.detect.outputs.publish_features }}' | jq -r '.[]'); do
-            ver=$(jq -r '.version' "src/$f/devcontainer-feature.json")
-            tag="$f-v$ver"
-            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-              echo "tag exists, skipping: $tag"
-              continue
-            fi
-            git tag -a "$tag" -m "$f $ver"
-            git push origin "$tag"
-            echo "tagged: $tag"
-          done

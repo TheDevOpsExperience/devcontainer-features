@@ -1,0 +1,27 @@
+{
+  "id": "gemini",
+  "version": "1.0.0",
+  "name": "Gemini CLI",
+  "description": "Google Gemini CLI",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/gemini",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "skip_permissions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Launch Gemini CLI with GEMINI_CLI_YOLO=true (skips confirmation prompts). Appropriate for sandboxed devcontainers."
+    }
+  },
+  "mounts": [
+    {
+      "source": "gemini-${localWorkspaceFolderBasename}",
+      "target": "/dc-volumes/gemini",
+      "type": "volume"
+    }
+  ],
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ],
+  "postCreateCommand": "/usr/local/share/devcontainer/gemini/create.sh",
+  "postStartCommand": "/usr/local/share/devcontainer/gemini/setup.sh"
+}

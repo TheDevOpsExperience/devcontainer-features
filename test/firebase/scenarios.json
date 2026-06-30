@@ -1,0 +1,14 @@
+{
+  "test": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-bookworm",
+    "features": {
+      "core": {},
+      "ghcr.io/devcontainers/features/java:1": {},
+      "firebase": {}
+    },
+    "overrideFeatureInstallOrder": [
+      "./core",
+      "ghcr.io/devcontainers/features/java"
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+// Example consumer devcontainer.json for the TheDevOpsExperience feature
+// collection. Copy into your project's .devcontainer/, then keep only the
+// features you need (core is always required) and adjust options/ports.
+//
+// Features are referenced by their published GHCR URIs. `core` must install
+// first; every other feature declares installsAfter: core, so OCI consumers get
+// the right order automatically.
+{
+  "name": "Developer Sandbox - ${localWorkspaceFolderBasename}",
+  "image": "ghcr.io/thedevopsexperience/tde-base:node24",
+  "features": {
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core:1": {
+      // idle_stop: stop the container once VS Code has been disconnected for
+      // idle_grace seconds (covers CLI-launched containers too). Default false;
+      // recommended for sandboxes.
+      "idle_stop": true,
+      "idle_grace": "120" // seconds before idle-stop halts the container (default)
+    },
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/firewall:1": {
+      // install_extension: bundle the Firewall Monitor VS Code extension
+      // (allowlist view, attempted/denied panel, revoke/allow/ignore actions).
+      "install_extension": true // default
+    },
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/buildkit:1": {
+      "version": "latest", // buildctl client version, no leading "v" (default)
+      "daemon_host": "buildkitd", // must match the sidecar name + --network (default)
+      "daemon_port": "1234" // port the buildkitd sidecar listens on (default)
+    },
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/1password:1": {},
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/claude:1": {
+      "skip_permissions": false
+    },
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/codex:1": {
+      "skip_permissions": false
+    },
+    // `gemini` and `antigravity` are mutually exclusive — enable only one.
+    // gemini: API-key / Code Assist auth. antigravity: account-OAuth (agy).
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/antigravity:1": {
+      "skip_permissions": false
+    },
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/gcloud:1": {},
+    // firebase installs via npm and its emulators need a Java runtime:
+    "ghcr.io/devcontainers/features/java:1": {},
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/firebase:1": {}
+  },
+  // firebase emulator ports — see the firebase feature README. Trim to taste.
+  "forwardPorts": [
+    9099,
+    4000,
+    4400,
+    8080,
+    9199,
+    9150,
+    8085
+  ],
+  "initializeCommand": ".devcontainer/hooks/on-init.sh",
+  "waitFor": "postStartCommand",
+  "shutdownAction": "stopContainer",
+  "remoteUser": "node",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace",
+  // NET_ADMIN / NET_RAW (needed by the firewall) come from the firewall
+  // feature's capAdd — no --cap-add needed here while that feature is enabled.
+  "runArgs": [
+    "--network=devcontainer-shared",
+    "--stop-timeout=30",
+    "--env-file",
+    ".devcontainer/.init/devcontainer.env"
+  ]
+}

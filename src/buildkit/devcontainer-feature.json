@@ -1,0 +1,39 @@
+{
+  "id": "buildkit",
+  "version": "1.0.0",
+  "name": "BuildKit",
+  "description": "BuildKit client (buildctl) connecting to a shared buildkitd daemon",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/buildkit",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": [
+        "latest",
+        "0.16.0"
+      ],
+      "description": "BuildKit version (without v prefix) or latest"
+    },
+    "daemon_host": {
+      "type": "string",
+      "default": "buildkitd",
+      "description": "Hostname of the BuildKit daemon container (must match the container name in on-init.sh)"
+    },
+    "daemon_port": {
+      "type": "string",
+      "default": "1234",
+      "description": "Port the BuildKit daemon listens on"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ]
+}

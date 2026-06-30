@@ -1,0 +1,11 @@
+{
+  "id": "firebase",
+  "version": "1.0.0",
+  "name": "Firebase Tools",
+  "description": "Firebase CLI and emulators (via npm)",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/firebase",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ]
+}

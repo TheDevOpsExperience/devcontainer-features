@@ -1,0 +1,11 @@
+# devcontainer host-init scratch (may contain secrets — never commit)
+.devcontainer/.init/
+
+# node / tooling
+node_modules/
+
+# OS / editor cruft
+.DS_Store
+*.log
+*.bak
+*.orig

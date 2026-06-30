@@ -1,0 +1,34 @@
+{
+  "id": "codex",
+  "version": "1.0.0",
+  "name": "Codex CLI",
+  "description": "OpenAI Codex CLI (codex) — the native terminal coding agent. Installs the official binary (no Node) and registers its runtime domains with the firewall.",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/codex",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "skip_permissions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alias `codex` with --yolo (skips approval prompts and the built-in sandbox). Appropriate for sandboxed devcontainers where the firewall replaces the permission system."
+    }
+  },
+  "mounts": [
+    {
+      "source": "codex-${localWorkspaceFolderBasename}",
+      "target": "/dc-volumes/codex",
+      "type": "volume"
+    }
+  ],
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ],
+  "postCreateCommand": "/usr/local/share/devcontainer/codex/create.sh",
+  "postStartCommand": "/usr/local/share/devcontainer/codex/setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "openai.chatgpt"
+      ]
+    }
+  }
+}

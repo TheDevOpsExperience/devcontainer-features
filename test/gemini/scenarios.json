@@ -1,0 +1,12 @@
+{
+  "test": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-bookworm",
+    "features": {
+      "core": {},
+      "gemini": {}
+    },
+    "overrideFeatureInstallOrder": [
+      "./core"
+    ]
+  }
+}

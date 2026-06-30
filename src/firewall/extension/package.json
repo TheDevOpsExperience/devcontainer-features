@@ -1,0 +1,183 @@
+{
+  "name": "firewall-monitor",
+  "displayName": "Firewall Monitor",
+  "description": "View the devcontainer firewall allowlist, revoke session domains, and get notified when a domain is allowed at runtime.",
+  "version": "1.0.0",
+  "publisher": "thedevopsexperience",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "firewallMonitor",
+          "title": "Firewall",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "firewallMonitor": [
+        {
+          "id": "firewallAllowlist",
+          "name": "Allowlist"
+        },
+        {
+          "id": "firewallAttempts",
+          "name": "Attempted / Denied"
+        },
+        {
+          "id": "firewallIgnored",
+          "name": "Ignored"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "firewall.refresh",
+        "title": "Firewall: Refresh Allowlist",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "firewall.revoke",
+        "title": "Firewall: Revoke Session Domain",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "firewall.refreshAttempts",
+        "title": "Firewall: Refresh Attempts",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "firewall.ignore",
+        "title": "Firewall: Ignore Domain",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "firewall.allowPersistent",
+        "title": "Firewall: Allow Domain (persistent)",
+        "icon": "$(check)"
+      },
+      {
+        "command": "firewall.allowTemp",
+        "title": "Firewall: Allow Domain (this session)",
+        "icon": "$(clock)"
+      },
+      {
+        "command": "firewall.removePersistent",
+        "title": "Firewall: Remove Persistent Domain",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "firewall.refreshIgnored",
+        "title": "Firewall: Refresh Ignored",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "firewall.unignore",
+        "title": "Firewall: Stop Ignoring Domain",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "firewall.allowFromIgnored",
+        "title": "Firewall: Move Ignored Domain to Allowed (persistent)",
+        "icon": "$(check)"
+      },
+      {
+        "command": "firewall.openFile",
+        "title": "Firewall: Open Log / Config File",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "firewall.addSession",
+        "title": "Firewall: Add Domain (this session)",
+        "icon": "$(add)"
+      },
+      {
+        "command": "firewall.addPersistent",
+        "title": "Firewall: Add Domain (persistent)",
+        "icon": "$(add)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "firewall.refresh",
+          "when": "view == firewallAllowlist",
+          "group": "navigation@1"
+        },
+        {
+          "command": "firewall.refreshAttempts",
+          "when": "view == firewallAttempts",
+          "group": "navigation@1"
+        },
+        {
+          "command": "firewall.refreshIgnored",
+          "when": "view == firewallIgnored",
+          "group": "navigation@1"
+        },
+        {
+          "command": "firewall.openFile",
+          "when": "view == firewallAllowlist || view == firewallAttempts || view == firewallIgnored",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "firewall.revoke",
+          "when": "view == firewallAllowlist && viewItem == session",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.addSession",
+          "when": "view == firewallAllowlist && viewItem == group-session",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.addPersistent",
+          "when": "view == firewallAllowlist && viewItem == group-persistent",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.removePersistent",
+          "when": "view == firewallAllowlist && viewItem == persistent",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.allowFromIgnored",
+          "when": "view == firewallIgnored && viewItem == ignored",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.unignore",
+          "when": "view == firewallIgnored && viewItem =~ /^ignored/",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.allowTemp",
+          "when": "view == firewallAttempts && viewItem == attempt",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.allowPersistent",
+          "when": "view == firewallAttempts && viewItem == attempt",
+          "group": "inline"
+        },
+        {
+          "command": "firewall.ignore",
+          "when": "view == firewallAttempts && viewItem == attempt",
+          "group": "inline"
+        }
+      ]
+    }
+  }
+}

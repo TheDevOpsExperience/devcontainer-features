@@ -1,0 +1,37 @@
+{
+  "id": "claude",
+  "version": "1.0.0",
+  "name": "Claude Code",
+  "description": "Claude Code CLI with pre-configured settings and status line",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/claude",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "skip_permissions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Launch Claude Code with --dangerously-skip-permissions. Appropriate for sandboxed devcontainers where the firewall replaces Claude's permission system."
+    }
+  },
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/dc-volumes/claude"
+  },
+  "mounts": [
+    {
+      "source": "claude-${localWorkspaceFolderBasename}",
+      "target": "/dc-volumes/claude",
+      "type": "volume"
+    }
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code"
+      ]
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ],
+  "postCreateCommand": "/usr/local/share/devcontainer/claude/create.sh",
+  "postStartCommand": "/usr/local/share/devcontainer/claude/setup.sh"
+}
