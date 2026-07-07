@@ -139,14 +139,12 @@ fi
 
 # Then source project + personal interactive-zsh live from the workspace's
 # .devcontainer/zshrc.d — after feature drop-ins, so project config wins and
-# the personal .overrides.zsh wins last. create.sh writes this loader with the
-# resolved workspace path (pre-created here so create.sh can write it as the
-# non-root remote user). Skipped when the base image already wired it.
-PROJECT_LOADER=/usr/local/share/devcontainer/project-zshrc.zsh
-touch "$PROJECT_LOADER"
-chown ${USERNAME}:${USERNAME} "$PROJECT_LOADER"
-if ! grep -qs 'devcontainer/project-zshrc.zsh' "$ZSHRC"; then
-    echo '[ -r /usr/local/share/devcontainer/project-zshrc.zsh ] && source /usr/local/share/devcontainer/project-zshrc.zsh' >> "$ZSHRC"
+# the personal .overrides.zsh wins last. create.sh (running as the remote user)
+# writes this loader into the user's home with the resolved workspace path;
+# home avoids the root-owned /usr/local/share permission problem. $HOME is left
+# literal so it resolves per-user at shell start. Skipped when already wired.
+if ! grep -qs 'devcontainer-project-zshrc' "$ZSHRC"; then
+    echo '[ -r "$HOME/.devcontainer-project-zshrc.zsh" ] && source "$HOME/.devcontainer-project-zshrc.zsh"' >> "$ZSHRC"
 fi
 
 # History persistence into the /dc-volumes/commandhistory volume. Skipped when
