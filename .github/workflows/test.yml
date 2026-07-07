@@ -11,11 +11,6 @@ permissions:
   contents: read
   packages: read
 
-# Some pinned actions (docker/login-action@v3, devcontainers/action@v1) still
-# ship Node 20 entry points. Force Node 24 until they publish Node 24 releases.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   detect:
     runs-on: ubuntu-latest
@@ -62,7 +57,7 @@ jobs:
       # Scenario tests resolve installsAfter (e.g. core) from GHCR. Log in so
       # the dependency pull is authenticated even while packages are private.
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
