@@ -129,6 +129,26 @@ if ! grep -qs '/etc/profile.d' "$ZSHRC"; then
     echo 'for _f in /etc/profile.d/*.sh(N); do [ -r "$_f" ] && . "$_f"; done; unset _f' >> "$ZSHRC"
 fi
 
+# Source feature-contributed interactive-zsh snippets (prompt segments,
+# keybinds, functions) from zshrc.d, after oh-my-zsh so RPROMPT edits stick.
+# Skipped when the base image already wired it.
+mkdir -p /usr/local/share/devcontainer/zshrc.d
+if ! grep -qs 'devcontainer/zshrc.d' "$ZSHRC"; then
+    echo 'for _f in /usr/local/share/devcontainer/zshrc.d/*.zsh(N); do [ -r "$_f" ] && source "$_f"; done; unset _f' >> "$ZSHRC"
+fi
+
+# Then source project + personal interactive-zsh live from the workspace's
+# .devcontainer/zshrc.d — after feature drop-ins, so project config wins and
+# the personal .overrides.zsh wins last. create.sh writes this loader with the
+# resolved workspace path (pre-created here so create.sh can write it as the
+# non-root remote user). Skipped when the base image already wired it.
+PROJECT_LOADER=/usr/local/share/devcontainer/project-zshrc.zsh
+touch "$PROJECT_LOADER"
+chown ${USERNAME}:${USERNAME} "$PROJECT_LOADER"
+if ! grep -qs 'devcontainer/project-zshrc.zsh' "$ZSHRC"; then
+    echo '[ -r /usr/local/share/devcontainer/project-zshrc.zsh ] && source /usr/local/share/devcontainer/project-zshrc.zsh' >> "$ZSHRC"
+fi
+
 # History persistence into the /dc-volumes/commandhistory volume. Skipped when
 # the base image already wired it.
 if ! grep -qs 'HISTFILE=' "$ZSHRC"; then
@@ -144,8 +164,7 @@ fi
 
 mkdir -p /dc-volumes/commandhistory
 touch /dc-volumes/commandhistory/.bash_history \
-    /dc-volumes/commandhistory/.zsh_history \
-    /dc-volumes/commandhistory/.zsh_profile
+    /dc-volumes/commandhistory/.zsh_history
 chown -R ${USERNAME}:${USERNAME} /dc-volumes/commandhistory
 chown ${USERNAME}:${USERNAME} "$ZSHRC" "$BASHRC"
 

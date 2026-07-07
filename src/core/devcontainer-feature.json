@@ -1,11 +1,11 @@
 {
   "id": "core",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Core Development Tools",
   "description": "Baseline tools (zsh, git, curl, jq, gpg, sudo) and devcontainer lifecycle runners. Works on any apt-based image.",
   "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/core",
   "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
-  "postCreateCommand": "/usr/local/share/devcontainer/core/create.sh",
+  "postCreateCommand": "/usr/local/share/devcontainer/core/create.sh ${containerWorkspaceFolder}",
   "postStartCommand": "/usr/local/share/devcontainer/core/setup.sh",
   "postAttachCommand": "/usr/local/share/devcontainer/core/attach.sh ${containerWorkspaceFolder}",
   "options": {

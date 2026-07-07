@@ -161,9 +161,21 @@ Prefer the authoritative vendor "network requirements / restricted network" doc 
 
 ### oh-my-zsh plugin registry
 
-Same drop-in pattern as `domains.d/`, for oh-my-zsh plugins. A feature that wants its matching plugin enabled writes one plugin name per line to `/usr/local/share/devcontainer/zsh-plugins.d/<feature>.conf` in its `install.sh` (e.g. `k8s` writes `kubectl`/`kubectx`/`helm`). Core's `zsh_plugins` option writes the user's own list to `user-plugins.conf`. Core's `create.sh` merges every `.conf` (plus the always-on `git`/`fzf` baseline) into the `.zshrc` `plugins=()` array at container-create — deduped, and regenerated from the registry each create so it's idempotent across rebuilds.
+Same drop-in pattern as `domains.d/`, for oh-my-zsh plugins. A feature that wants its matching plugin enabled writes one plugin name per line to `/usr/local/share/devcontainer/zsh-plugins.d/<feature>.conf` in its `install.sh` (e.g. `k8s` writes `kubectl`/`helm`). Core's `zsh_plugins` option writes the user's own list to `user-plugins.conf`. Core's `create.sh` merges every `.conf` (plus the always-on `git`/`fzf` baseline) into the `.zshrc` `plugins=()` array at container-create — deduped, and regenerated from the registry each create so it's idempotent across rebuilds.
 
 This decouples features from core: enabling a feature never requires touching `core.zsh_plugins`. Only enable a plugin whose tool the feature actually installs, and only one that ships bundled with oh-my-zsh (no separate plugin install — sourcing the bundled file is what enables it). Timing works because `create.sh` runs after every feature's `install.sh`, so all `.conf` files exist when the merge runs.
+
+### Interactive-zsh drop-ins (`zshrc.d/`)
+
+The interactive-zsh sibling of `profile.d` (env, `sh`) and `zsh-plugins.d` (plugins): for prompt segments, keybinds, functions — anything needing a live zsh. Core appends two lines to `.zshrc` (after oh-my-zsh/theme, so `RPROMPT` edits stick without a `precmd`) that source, in three tiers, last-wins:
+
+1. **Features** — a feature drops `/usr/local/share/devcontainer/zshrc.d/<name>.zsh` in its `install.sh` (baked at build). `k8s` adds a kube-context `RPROMPT` segment.
+2. **Project** — every `*.zsh` in the workspace's `.devcontainer/zshrc.d/` (committed, team-shared). `create.sh` writes `/usr/local/share/devcontainer/project-zshrc.zsh` (the loader) with the resolved `${containerWorkspaceFolder}` — passed as the first arg to `create.sh` via core's `postCreateCommand`. Sourced **live** from the bind-mounted workspace, so edits land in any new terminal, no rebuild. `install.sh` pre-creates + chowns the loader file so `create.sh` (runs as the non-root remote user) can write it.
+3. **Personal** — `.devcontainer/zshrc.d/.overrides.zsh` (gitignored). The leading dot keeps it out of the project `*.zsh(N)` glob; the loader sources it **explicitly last**, so it wins.
+
+**Prompt lanes, so features and the user don't collide:** the theme owns `PROMPT` (left); features append **`RPROMPT`** segments (robbyrussell leaves it empty). Project/personal tiers are sourced after features, so a user's own prompt/theme wins. Each feature segment must honor a documented opt-out env (e.g. `k8s` → `K8S_HIDE_CONTEXT=1`) so a user can silence one segment while keeping the default prompt. See `examples/zshrc.d/` for the consumer layout.
+
+**The `commandhistory` volume holds history only** (`.bash_history`, `.zsh_history`) — no shell config. Interactive-zsh config lives in `zshrc.d` (feature/project/personal), never on that volume.
 
 ### Package installation inside containers
 

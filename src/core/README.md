@@ -121,6 +121,31 @@ the array by `create.sh` — regenerated from the registry each create, so it's
 idempotent across rebuilds. Only bundled oh-my-zsh plugins work (no separate
 install; sourcing the shipped plugin file is what enables it).
 
+## Prompt & interactive-zsh drop-ins
+
+For live-zsh customization (prompt segments, keybinds, functions) core sources,
+at the **end** of `.zshrc` (after oh-my-zsh and the theme), in three tiers:
+
+1. **Features** — every `*.zsh` in `/usr/local/share/devcontainer/zshrc.d/`
+   (baked at build). e.g. `k8s` adds an active-kube-context `RPROMPT` segment.
+2. **Project** — every `*.zsh` in your workspace's `.devcontainer/zshrc.d/`
+   (committed, shared). Sourced live from the bind-mounted workspace, so edits
+   show up in any new terminal — no rebuild.
+3. **Personal** — `.devcontainer/zshrc.d/.overrides.zsh` (gitignored). Sourced
+   **last**, so it wins.
+
+Prompt ownership stays clean:
+
+- **Theme owns the left prompt** (`PROMPT`) — robbyrussell by default.
+- **Features append the right prompt** (`RPROMPT`) — never touch the left.
+- **You win last** via project `*.zsh` (team) or `.overrides.zsh` (personal):
+  set your own `PROMPT`/`RPROMPT`/theme there and it overrides everything, or
+  silence one feature's segment with its opt-out env (e.g. `export K8S_HIDE_CONTEXT=1`).
+
+See [`examples/zshrc.d/`](../../examples/zshrc.d/) for a starter layout. Note the
+`commandhistory` volume holds **only** shell history (`.bash_history`,
+`.zsh_history`) — shell config lives here, not on that volume.
+
 ## Credits
 
 `install-package.sh` is adapted from [ilang/claude-code-dev-container](https://github.com/ilang/claude-code-dev-container) (MIT), which builds on Anthropic's [Claude Code devcontainer](https://github.com/anthropics/claude-code/tree/main/.devcontainer) (proprietary; credited for attribution only). See the repo [NOTICE](../../NOTICE) for full third-party licenses.

@@ -1,0 +1,13 @@
+# Personal zsh overrides — copy to ".overrides.zsh" (gitignored) and edit.
+# Sourced LAST, so anything here wins over features and project config.
+# Live: any new terminal picks up edits, no rebuild.
+
+# Your own prompt / theme:
+# PROMPT='%~ %# '
+# RPROMPT=''
+
+# Silence a feature's prompt segment while keeping the default prompt:
+# export K8S_HIDE_CONTEXT=1
+
+# Personal aliases:
+# alias ll='ls -lah'
