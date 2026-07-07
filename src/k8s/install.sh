@@ -54,3 +54,34 @@ curl -fsSL "https://github.com/ahmetb/kubectx/releases/download/${KUBECTX_VERSIO
     | tar -xz -C /usr/local/bin kubens
 
 echo "kubectl ${KUBECTL_VERSION}, helm ${HELM_VERSION}, kubectx/kubens ${KUBECTX_VERSION} installed."
+
+# Enable the matching oh-my-zsh plugins. Core merges this into the .zshrc
+# plugins=() array at create time; no core config needed.
+#   kubectl/helm — aliases + completion.
+#   kubectx      — provides kubectx_prompt_info() for the prompt segment below
+#                  (the ahmetb kubectx/kubens binaries carry their own completion).
+mkdir -p /usr/local/share/devcontainer/zsh-plugins.d
+printf '%s\n' kubectl helm kubectx > /usr/local/share/devcontainer/zsh-plugins.d/k8s.conf
+
+# Show the active kube-context on the right prompt (RPROMPT), via core's
+# zshrc.d drop-in (sourced after the theme, so the kubectx plugin's
+# kubectx_prompt_info is already defined). Left prompt stays the user's.
+# Opt out with K8S_HIDE_CONTEXT=1, or set your own RPROMPT in
+# .devcontainer/zshrc.d/.overrides.zsh (sourced last) to override entirely.
+mkdir -p /usr/local/share/devcontainer/zshrc.d
+cat > /usr/local/share/devcontainer/zshrc.d/kube-context.zsh << 'EOF'
+# kube_context_prompt — reusable prompt segment. Echoes " ⎈ <context>:<namespace>"
+# (namespace omitted if unset), or nothing when there's no context / no kubectl /
+# K8S_HIDE_CONTEXT is set. Safe in PROMPT_SUBST. Public: call it from your own
+# PROMPT/RPROMPT in .devcontainer/zshrc.d/.overrides.zsh to reuse this piece.
+kube_context_prompt() {
+  [[ -n "$K8S_HIDE_CONTEXT" ]] && return
+  (( $+functions[kubectx_prompt_info] )) || return
+  local ctx; ctx=$(kubectx_prompt_info) || return   # context (honors kubectx_mapping)
+  [[ -n "$ctx" ]] || return
+  # kubectl is present (kubectx_prompt_info already checked); append namespace.
+  local ns; ns=$(kubectl config view --minify -o jsonpath='{..namespace}' 2>/dev/null)
+  echo " ⎈ ${ctx}${ns:+:$ns}"
+}
+RPROMPT='$(kube_context_prompt)'"${RPROMPT}"
+EOF

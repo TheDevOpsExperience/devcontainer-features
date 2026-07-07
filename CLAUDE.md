@@ -161,7 +161,7 @@ Prefer the authoritative vendor "network requirements / restricted network" doc 
 
 ### oh-my-zsh plugin registry
 
-Same drop-in pattern as `domains.d/`, for oh-my-zsh plugins. A feature that wants its matching plugin enabled writes one plugin name per line to `/usr/local/share/devcontainer/zsh-plugins.d/<feature>.conf` in its `install.sh` (e.g. `k8s` writes `kubectl`/`helm`). Core's `zsh_plugins` option writes the user's own list to `user-plugins.conf`. Core's `create.sh` merges every `.conf` (plus the always-on `git`/`fzf` baseline) into the `.zshrc` `plugins=()` array at container-create — deduped, and regenerated from the registry each create so it's idempotent across rebuilds.
+Same drop-in pattern as `domains.d/`, for oh-my-zsh plugins. A feature that wants its matching plugin enabled writes one plugin name per line to `/usr/local/share/devcontainer/zsh-plugins.d/<feature>.conf` in its `install.sh` (e.g. `k8s` writes `kubectl`/`helm` for aliases+completion, plus `kubectx` for its `kubectx_prompt_info` used by the prompt segment). Core's `zsh_plugins` option writes the user's own list to `user-plugins.conf`. Core's `create.sh` merges every `.conf` (plus the always-on `git`/`fzf` baseline) into the `.zshrc` `plugins=()` array at container-create — deduped, and regenerated from the registry each create so it's idempotent across rebuilds.
 
 This decouples features from core: enabling a feature never requires touching `core.zsh_plugins`. Only enable a plugin whose tool the feature actually installs, and only one that ships bundled with oh-my-zsh (no separate plugin install — sourcing the bundled file is what enables it). Timing works because `create.sh` runs after every feature's `install.sh`, so all `.conf` files exist when the merge runs.
 

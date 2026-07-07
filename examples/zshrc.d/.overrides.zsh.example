@@ -6,6 +6,11 @@
 # PROMPT='%~ %# '
 # RPROMPT=''
 
+# Reuse a feature's prompt segment in your own prompt — e.g. the k8s feature
+# exposes kube_context_prompt (echoes " ⎈ <context>:<namespace>"):
+# RPROMPT=''
+# PROMPT='%~ $(kube_context_prompt) %# '
+
 # Silence a feature's prompt segment while keeping the default prompt:
 # export K8S_HIDE_CONTEXT=1
 
