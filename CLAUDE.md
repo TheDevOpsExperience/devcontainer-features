@@ -159,6 +159,12 @@ Features that need network access at runtime register their domains in `/usr/loc
 
 Prefer the authoritative vendor "network requirements / restricted network" doc over guessing; cite it in a comment above the heredoc (see `claude/install.sh`). Add a short comment explaining why each non-obvious domain is needed and why notable ones were left out.
 
+### oh-my-zsh plugin registry
+
+Same drop-in pattern as `domains.d/`, for oh-my-zsh plugins. A feature that wants its matching plugin enabled writes one plugin name per line to `/usr/local/share/devcontainer/zsh-plugins.d/<feature>.conf` in its `install.sh` (e.g. `k8s` writes `kubectl`/`kubectx`/`helm`). Core's `zsh_plugins` option writes the user's own list to `user-plugins.conf`. Core's `create.sh` merges every `.conf` (plus the always-on `git`/`fzf` baseline) into the `.zshrc` `plugins=()` array at container-create — deduped, and regenerated from the registry each create so it's idempotent across rebuilds.
+
+This decouples features from core: enabling a feature never requires touching `core.zsh_plugins`. Only enable a plugin whose tool the feature actually installs, and only one that ships bundled with oh-my-zsh (no separate plugin install — sourcing the bundled file is what enables it). Timing works because `create.sh` runs after every feature's `install.sh`, so all `.conf` files exist when the merge runs.
+
 ### Package installation inside containers
 
 Do NOT use `apt-get` directly from inside the container. Use the wrapper:
@@ -173,7 +179,7 @@ The `install-package.sh` script validates package names and rejects flags.
 
 | Feature | What it adds | Options |
 |---------|-------------|---------|
-| `core` | Baseline packages, helper scripts + sudoers, shell/Oh My Zsh setup, SSH config setup, volume ownership fixes, idle-stop watchdog — **required by all others** | `idle_stop`, `idle_grace` |
+| `core` | Baseline packages, helper scripts + sudoers, shell/Oh My Zsh setup, SSH config setup, volume ownership fixes, idle-stop watchdog, oh-my-zsh plugin registry — **required by all others** | `idle_stop`, `idle_grace`, `zsh_plugins` |
 | `firewall` | iptables/ipset allowlist firewall, DNS capture, `allow-domain.sh`, `revoke-domain.sh`, `list-domains.sh` (+`--json`), `list-attempts.sh` (+`--json`), Firewall Monitor VS Code extension | `install_extension` |
 | `buildkit` | `buildctl` client + `docker-build` wrapper; connects to shared `buildkitd` sidecar | `version`, `daemon_host`, `daemon_port` |
 | `1password` | `op` CLI via apt repository + SA-token host-init | — |

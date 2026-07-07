@@ -149,6 +149,15 @@ touch /dc-volumes/commandhistory/.bash_history \
 chown -R ${USERNAME}:${USERNAME} /dc-volumes/commandhistory
 chown ${USERNAME}:${USERNAME} "$ZSHRC" "$BASHRC"
 
+# oh-my-zsh plugin registry. Features drop <feature>.conf here (one plugin
+# name per line); core's create.sh merges every .conf into the .zshrc
+# plugins=() array at container-create (after all installs have run). The
+# user's own list comes from the zsh_plugins option.
+mkdir -p /usr/local/share/devcontainer/zsh-plugins.d
+if [ -n "${ZSH_PLUGINS:-}" ]; then
+    printf '%s\n' ${ZSH_PLUGINS} > /usr/local/share/devcontainer/zsh-plugins.d/user-plugins.conf
+fi
+
 # ── Config volume ─────────────────────────────────────────────────────────────
 # Config directory — user-neutral volume mount target, symlinked into the
 # user's home. Feature mounts can't reference the remote user, so the volume

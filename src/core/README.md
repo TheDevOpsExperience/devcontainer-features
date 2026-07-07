@@ -98,6 +98,29 @@ presence, since stale socket files linger after disconnect. Activity is logged t
 clean window-close path. Note: a tight `idle_grace` can trip on laptop sleep or a
 brief network blip — bump it if that bites.
 
+## oh-my-zsh plugin registry
+
+Core assembles the `.zshrc` `plugins=()` array from a drop-in registry at
+container-create, so plugins can come from two sources without coupling:
+
+- **Features** — a feature drops `/usr/local/share/devcontainer/zsh-plugins.d/<feature>.conf`
+  (one bundled oh-my-zsh plugin name per line) in its `install.sh`. Installing the
+  feature enables its plugin; no core config needed. (`k8s`, e.g., enables
+  `kubectl`/`kubectx`/`helm`.)
+- **You** — the `zsh_plugins` option (space-separated) adds your own:
+
+```jsonc
+// devcontainer.json
+"features": {
+  "ghcr.io/TheDevOpsExperience/devcontainer-features/core": { "zsh_plugins": "z you-should-use" }
+}
+```
+
+Both are merged with the always-on `git`/`fzf` baseline, deduped, and written to
+the array by `create.sh` — regenerated from the registry each create, so it's
+idempotent across rebuilds. Only bundled oh-my-zsh plugins work (no separate
+install; sourcing the shipped plugin file is what enables it).
+
 ## Credits
 
 `install-package.sh` is adapted from [ilang/claude-code-dev-container](https://github.com/ilang/claude-code-dev-container) (MIT), which builds on Anthropic's [Claude Code devcontainer](https://github.com/anthropics/claude-code/tree/main/.devcontainer) (proprietary; credited for attribution only). See the repo [NOTICE](../../NOTICE) for full third-party licenses.

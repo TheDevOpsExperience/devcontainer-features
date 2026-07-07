@@ -1,6 +1,6 @@
 {
   "id": "core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Core Development Tools",
   "description": "Baseline tools (zsh, git, curl, jq, gpg, sudo) and devcontainer lifecycle runners. Works on any apt-based image.",
   "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/core",
@@ -18,6 +18,11 @@
       "type": "string",
       "default": "120",
       "description": "Grace period in seconds before idle-stop halts the container after VS Code disconnects. Only applies when `idle_stop` is enabled."
+    },
+    "zsh_plugins": {
+      "type": "string",
+      "default": "",
+      "description": "Space-separated oh-my-zsh plugins to enable in addition to the always-on `git`/`fzf` and any registered by other features (e.g. \"z you-should-use\"). Merged with the plugin registry at create time."
     }
   },
   "containerEnv": {
