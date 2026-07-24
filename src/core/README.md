@@ -127,17 +127,21 @@ For live-zsh customization (prompt segments, keybinds, functions) core sources,
 at the **end** of `.zshrc` (after oh-my-zsh and the theme), in three tiers:
 
 1. **Features** — every `*.zsh` in `/usr/local/share/devcontainer/zshrc.d/`
-   (baked at build). e.g. `k8s` adds an active-kube-context `RPROMPT` segment.
+   (baked at build). e.g. `k8s` adds an active-kube-context `PROMPT` segment.
 2. **Project** — every `*.zsh` in your workspace's `.devcontainer/zshrc.d/`
    (committed, shared). Sourced live from the bind-mounted workspace, so edits
    show up in any new terminal — no rebuild.
 3. **Personal** — `.devcontainer/zshrc.d/.overrides.zsh` (gitignored). Sourced
    **last**, so it wins.
 
-Prompt ownership stays clean:
+Prompt ownership stays mostly clean:
 
 - **Theme owns the left prompt** (`PROMPT`) — robbyrussell by default.
-- **Features append the right prompt** (`RPROMPT`) — never touch the left.
+- **Features default to the right prompt** (`RPROMPT`), appending rather than
+  replacing — `k8s` is the one documented exception, appending to the left
+  `PROMPT` instead because the kube-context it shows is high-consequence
+  (which cluster you're pointed at) and easy to miss on the right edge of a
+  narrow terminal.
 - **You win last** via project `*.zsh` (team) or `.overrides.zsh` (personal):
   set your own `PROMPT`/`RPROMPT`/theme there and it overrides everything, or
   silence one feature's segment with its opt-out env (e.g. `export K8S_HIDE_CONTEXT=1`).

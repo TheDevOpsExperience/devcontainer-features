@@ -99,6 +99,7 @@ Feature mounts use `${localWorkspaceFolderBasename}` suffix so volumes are autom
 | `claude-<project>` | `/dc-volumes/claude` | `~/.claude` | `claude` |
 | `gemini-<project>` | `/dc-volumes/gemini` | `~/.gemini` | `gemini`, `antigravity` (shared — both use `~/.gemini`; mutually exclusive) |
 | `codex-<project>` | `/dc-volumes/codex` | `~/.codex`; `~/.agents` → `/dc-volumes/codex/agents` subdir | `codex` |
+| `kube-<project>` | `/dc-volumes/kube` | `~/.kube` | `k8s` |
 
 Mount targets are user-neutral `/dc-volumes/<name>` paths because feature mounts can't reference the remote user. Each feature's `install.sh` symlinks the corresponding home-dir path (for the user from `_REMOTE_USER`) to the volume, so the features work with any `remoteUser`.
 
@@ -169,11 +170,11 @@ This decouples features from core: enabling a feature never requires touching `c
 
 The interactive-zsh sibling of `profile.d` (env, `sh`) and `zsh-plugins.d` (plugins): for prompt segments, keybinds, functions — anything needing a live zsh. Core appends two lines to `.zshrc` (after oh-my-zsh/theme, so `RPROMPT` edits stick without a `precmd`) that source, in three tiers, last-wins:
 
-1. **Features** — a feature drops `/usr/local/share/devcontainer/zshrc.d/<name>.zsh` in its `install.sh` (baked at build). `k8s` adds a kube-context `RPROMPT` segment.
+1. **Features** — a feature drops `/usr/local/share/devcontainer/zshrc.d/<name>.zsh` in its `install.sh` (baked at build). `k8s` adds a kube-context `PROMPT` segment.
 2. **Project** — every `*.zsh` in the workspace's `.devcontainer/zshrc.d/` (committed, team-shared). `create.sh` writes the loader to `$HOME/.devcontainer-project-zshrc.zsh` with the resolved `${containerWorkspaceFolder}` — passed as the first arg to `create.sh` via core's `postCreateCommand`. Sourced **live** from the bind-mounted workspace, so edits land in any new terminal, no rebuild. The loader lives in the user's home (not root-owned `/usr/local/share`) because `create.sh` runs as the non-root remote user; the `.zshrc` source line keeps `$HOME` literal so it resolves per-user.
 3. **Personal** — `.devcontainer/zshrc.d/.overrides.zsh` (gitignored). The leading dot keeps it out of the project `*.zsh(N)` glob; the loader sources it **explicitly last**, so it wins.
 
-**Prompt lanes, so features and the user don't collide:** the theme owns `PROMPT` (left); features append **`RPROMPT`** segments (robbyrussell leaves it empty). Project/personal tiers are sourced after features, so a user's own prompt/theme wins. Each feature segment must honor a documented opt-out env (e.g. `k8s` → `K8S_HIDE_CONTEXT=1`) so a user can silence one segment while keeping the default prompt. See `examples/zshrc.d/` for the consumer layout.
+**Prompt lanes, so features and the user don't collide:** the theme owns `PROMPT` (left); features default to appending **`RPROMPT`** segments (robbyrussell leaves it empty). `k8s` is the one documented exception — it appends to `PROMPT` instead, since kube-context is high-consequence (which cluster you're pointed at) and easy to miss on the right edge of a narrow terminal; justify any future left-prompt feature the same way before deviating. Project/personal tiers are sourced after features, so a user's own prompt/theme wins. Each feature segment must honor a documented opt-out env (e.g. `k8s` → `K8S_HIDE_CONTEXT=1`) so a user can silence one segment while keeping the default prompt. See `examples/zshrc.d/` for the consumer layout.
 
 **The `commandhistory` volume holds history only** (`.bash_history`, `.zsh_history`) — no shell config. Interactive-zsh config lives in `zshrc.d` (feature/project/personal), never on that volume.
 

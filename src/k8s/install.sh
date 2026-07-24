@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-USERNAME="${USERNAME:-node}"
+# _REMOTE_USER / _REMOTE_USER_HOME are provided by the devcontainer CLI during feature install.
+USERNAME="${USERNAME:-${_REMOTE_USER:-node}}"
+USER_HOME="${_REMOTE_USER_HOME:-/home/${USERNAME}}"
 
 if [ ! -f /usr/local/share/devcontainer/.core-installed ]; then
     echo "ERROR: The 'core' feature must be installed before this feature." >&2; exit 1
@@ -55,18 +57,34 @@ curl -fsSL "https://github.com/ahmetb/kubectx/releases/download/${KUBECTX_VERSIO
 
 echo "kubectl ${KUBECTL_VERSION}, helm ${HELM_VERSION}, kubectx/kubens ${KUBECTX_VERSION} installed."
 
+# Config directory — user-neutral volume mount target, symlinked into the
+# user's home. Feature mounts can't reference the remote user, so the volume
+# targets /dc-volumes/kube; Docker seeds a fresh volume with this dir's
+# ownership. The symlink keeps ~/.kube working for any user, and kubectl's
+# default config path ($HOME/.kube/config) resolves through it — no env var
+# needed. Persists kubeconfig (contexts, kubectx_mapping-relevant names) across
+# rebuilds.
+mkdir -p /dc-volumes/kube
+if [ -d "${USER_HOME}/.kube" ] && [ ! -L "${USER_HOME}/.kube" ]; then
+    cp -a "${USER_HOME}/.kube/." /dc-volumes/kube/
+    rm -rf "${USER_HOME}/.kube"
+fi
+ln -sfn /dc-volumes/kube "${USER_HOME}/.kube"
+chown -R ${USERNAME}:${USERNAME} /dc-volumes/kube
+chown -h ${USERNAME}:${USERNAME} "${USER_HOME}/.kube"
+
 # Enable the matching oh-my-zsh plugins. Core merges this into the .zshrc
 # plugins=() array at create time; no core config needed.
 #   kubectl/helm — aliases + completion.
-#   kubectx      — provides kubectx_prompt_info() for the prompt segment below
-#                  (the ahmetb kubectx/kubens binaries carry their own completion).
+#   kubectx      — provides kubectx_prompt_info() for the prompt segment below.
 mkdir -p /usr/local/share/devcontainer/zsh-plugins.d
 printf '%s\n' kubectl helm kubectx > /usr/local/share/devcontainer/zsh-plugins.d/k8s.conf
 
-# Show the active kube-context on the right prompt (RPROMPT), via core's
+# Show the active kube-context on the left prompt (PROMPT), via core's
 # zshrc.d drop-in (sourced after the theme, so the kubectx plugin's
-# kubectx_prompt_info is already defined). Left prompt stays the user's.
-# Opt out with K8S_HIDE_CONTEXT=1, or set your own RPROMPT in
+# kubectx_prompt_info is already defined, and appending here composes with
+# whatever the theme already set, e.g. robbyrussell's own git segment).
+# Opt out with K8S_HIDE_CONTEXT=1, or set your own PROMPT in
 # .devcontainer/zshrc.d/.overrides.zsh (sourced last) to override entirely.
 mkdir -p /usr/local/share/devcontainer/zshrc.d
 cat > /usr/local/share/devcontainer/zshrc.d/kube-context.zsh << 'EOF'
@@ -83,5 +101,44 @@ kube_context_prompt() {
   local ns; ns=$(kubectl config view --minify -o jsonpath='{..namespace}' 2>/dev/null)
   echo " ⎈ ${ctx}${ns:+:$ns}"
 }
-RPROMPT='$(kube_context_prompt)'"${RPROMPT}"
+PROMPT+='$(kube_context_prompt)'
+
+# ktx/kns — short aliases for kubectx/kubens, with tab-completion for
+# context/namespace names. Upstream ships real completion (ahmetb/kubectx
+# completion/_kubectx.zsh, _kubens.zsh) but only as fpath-autoload files —
+# not in the release tarball we install from (.goreleaser.yml: binary +
+# LICENSE only), and not a binary subcommand either. Their delivery method
+# (drop in $fpath, let compinit's startup scan discover the #compdef header)
+# doesn't fit here: compinit already ran earlier in oh-my-zsh init, before
+# this drop-in loads, so a file landing in fpath this late wouldn't be
+# autoloaded without re-running compinit. Transcribed logic below, registered
+# via an explicit compdef instead — same escape hatch oh-my-zsh's own plugins
+# use for exactly this timing problem.
+alias ktx=kubectx
+alias kns=kubens
+
+_ktx() {
+  local -a context_array
+  context_array=(${(f)"$(kubectl config get-contexts --output=name 2>/dev/null)"})
+  local -a all_contexts
+  all_contexts=(${(q)context_array})
+  if [[ -f "${HOME}/.kube/kubectx" ]]; then
+    # A previous context is saved — offer '-' to switch back to it.
+    _arguments \
+      "-d:*: :(${all_contexts})" \
+      "(- *): :(- ${all_contexts})"
+  else
+    _arguments \
+      "-d:*: :(${all_contexts})" \
+      "(- *): :(${all_contexts})"
+  fi
+}
+compdef _ktx kubectx
+compdef _ktx ktx
+
+_kns() {
+  _arguments "1: :(- $(kubectl get namespaces -o=jsonpath='{range .items[*].metadata.name}{@}{"\n"}{end}' 2>/dev/null))"
+}
+compdef _kns kubens
+compdef _kns kns
 EOF
