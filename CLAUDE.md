@@ -174,7 +174,7 @@ The interactive-zsh sibling of `profile.d` (env, `sh`) and `zsh-plugins.d` (plug
 2. **Project** — every `*.zsh` in the workspace's `.devcontainer/zshrc.d/` (committed, team-shared). `create.sh` writes the loader to `$HOME/.devcontainer-project-zshrc.zsh` with the resolved `${containerWorkspaceFolder}` — passed as the first arg to `create.sh` via core's `postCreateCommand`. Sourced **live** from the bind-mounted workspace, so edits land in any new terminal, no rebuild. The loader lives in the user's home (not root-owned `/usr/local/share`) because `create.sh` runs as the non-root remote user; the `.zshrc` source line keeps `$HOME` literal so it resolves per-user.
 3. **Personal** — `.devcontainer/zshrc.d/.overrides.zsh` (gitignored). The leading dot keeps it out of the project `*.zsh(N)` glob; the loader sources it **explicitly last**, so it wins.
 
-**Prompt lanes, so features and the user don't collide:** the theme owns `PROMPT` (left); features default to appending **`RPROMPT`** segments (robbyrussell leaves it empty). `k8s` is the one documented exception — it appends to `PROMPT` instead, since kube-context is high-consequence (which cluster you're pointed at) and easy to miss on the right edge of a narrow terminal; justify any future left-prompt feature the same way before deviating. Project/personal tiers are sourced after features, so a user's own prompt/theme wins. Each feature segment must honor a documented opt-out env (e.g. `k8s` → `K8S_HIDE_CONTEXT=1`) so a user can silence one segment while keeping the default prompt. See `examples/zshrc.d/` for the consumer layout.
+**Prompt lanes, so features and the user don't collide:** the theme sets the initial `PROMPT`/`RPROMPT` (robbyrussell leaves `RPROMPT` empty). No enforced default lane for features — each picks whichever side fits its segment and extends (pre- or append) rather than replacing. `k8s` prepends to `PROMPT`, first in the chain ahead of the theme's own segments, since kube-context is high-consequence (which cluster you're pointed at) and easy to miss on the right edge of a narrow terminal. Project/personal tiers are sourced after features, so a user's own prompt/theme wins. Each feature segment must honor a documented opt-out env (e.g. `k8s` → `K8S_HIDE_CONTEXT=1`) so a user can silence one segment while keeping the default prompt. See `examples/zshrc.d/` for the consumer layout.
 
 **The `commandhistory` volume holds history only** (`.bash_history`, `.zsh_history`) — no shell config. Interactive-zsh config lives in `zshrc.d` (feature/project/personal), never on that volume.
 
@@ -192,7 +192,7 @@ The `install-package.sh` script validates package names and rejects flags.
 
 | Feature | What it adds | Options |
 |---------|-------------|---------|
-| `core` | Baseline packages, helper scripts + sudoers, shell/Oh My Zsh setup, SSH config setup, volume ownership fixes, idle-stop watchdog, oh-my-zsh plugin registry — **required by all others** | `idle_stop`, `idle_grace`, `zsh_plugins` |
+| `core` | Baseline packages, helper scripts + sudoers, shell/Oh My Zsh setup, SSH config setup, volume ownership fixes, idle-stop watchdog, oh-my-zsh plugin registry — **required by all others** | `idle_stop`, `idle_grace`, `zsh_plugins`, `git_prompt` |
 | `firewall` | iptables/ipset allowlist firewall, DNS capture, `allow-domain.sh`, `revoke-domain.sh`, `list-domains.sh` (+`--json`), `list-attempts.sh` (+`--json`), Firewall Monitor VS Code extension | `install_extension` |
 | `buildkit` | `buildctl` client + `docker-build` wrapper; connects to shared `buildkitd` sidecar | `version`, `daemon_host`, `daemon_port` |
 | `1password` | `op` CLI via apt repository + SA-token host-init | — |
@@ -216,6 +216,13 @@ The `install-package.sh` script validates package names and rejects flags.
   needs `ss`/`socat`/`pgrep`; logs to `/var/log/idle-stop.log`.
 - **`core.idle_grace`** (string, default `"120"`) — seconds before idle-stop
   halts the container. Aggressive values can trip on laptop-sleep / reconnect.
+- **`core.git_prompt`** (bool, default `true`) — robbyrussell's theme bakes
+  `$(git_prompt_info)` into its own `PROMPT` unconditionally. The
+  `zshrc.d/git-prompt.zsh` drop-in strips that (so core, not the theme, owns
+  whether it shows — no theme-file patch, survives oh-my-zsh updates and the
+  "already installed, skip" branch) and re-adds it with
+  `PROMPT+=' $(git_prompt_info)'` only when enabled — same pattern as k8s's
+  own prompt segment. Regenerated every install.
 - **`firewall.install_extension`** (bool, default `true`) — installs the Firewall
   Monitor VS Code extension (allowlist TreeView, session-domain revoke, runtime
   allow-event toasts). The `.vsix` is built in CI (`release.yml` "Bundle

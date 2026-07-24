@@ -80,28 +80,37 @@ chown -h ${USERNAME}:${USERNAME} "${USER_HOME}/.kube"
 mkdir -p /usr/local/share/devcontainer/zsh-plugins.d
 printf '%s\n' kubectl helm kubectx > /usr/local/share/devcontainer/zsh-plugins.d/k8s.conf
 
-# Show the active kube-context on the left prompt (PROMPT), via core's
-# zshrc.d drop-in (sourced after the theme, so the kubectx plugin's
-# kubectx_prompt_info is already defined, and appending here composes with
-# whatever the theme already set, e.g. robbyrussell's own git segment).
+# Show the active kube-context on the left prompt (PROMPT), first in the
+# chain (prepended, ahead of the theme's own segments — e.g. robbyrussell's
+# arrow + cwd + git), via core's zshrc.d drop-in (sourced after the theme, so
+# the kubectx plugin's kubectx_prompt_info is already defined).
 # Opt out with K8S_HIDE_CONTEXT=1, or set your own PROMPT in
 # .devcontainer/zshrc.d/.overrides.zsh (sourced last) to override entirely.
 mkdir -p /usr/local/share/devcontainer/zshrc.d
 cat > /usr/local/share/devcontainer/zshrc.d/kube-context.zsh << 'EOF'
-# kube_context_prompt — reusable prompt segment. Echoes " ⎈ <context>:<namespace>"
-# (namespace omitted if unset), or nothing when there's no context / no kubectl /
-# K8S_HIDE_CONTEXT is set. Safe in PROMPT_SUBST. Public: call it from your own
-# PROMPT/RPROMPT in .devcontainer/zshrc.d/.overrides.zsh to reuse this piece.
+# kube_context_prompt — reusable prompt segment. Echoes a robbyrussell-style
+# bracketed segment " k8s:(<context>:<namespace>)" (":<namespace>" omitted
+# when no namespace is selected — just "k8s:(<context>)"), or nothing when
+# there's no active context / no kubectl / K8S_HIDE_CONTEXT is set — same as
+# the theme's own git segment showing nothing outside a git repo. Safe in PROMPT_SUBST.
+# Public: call it from your own PROMPT/RPROMPT in
+# .devcontainer/zshrc.d/.overrides.zsh to reuse this piece.
 kube_context_prompt() {
   [[ -n "$K8S_HIDE_CONTEXT" ]] && return
-  (( $+functions[kubectx_prompt_info] )) || return
-  local ctx; ctx=$(kubectx_prompt_info) || return   # context (honors kubectx_mapping)
+  (( $+commands[kubectl] )) || return
+  local ctx
+  if (( $+functions[kubectx_prompt_info] )); then
+    ctx=$(kubectx_prompt_info)   # honors kubectx_mapping
+  else
+    ctx=$(kubectl config current-context 2>/dev/null)
+  fi
   [[ -n "$ctx" ]] || return
-  # kubectl is present (kubectx_prompt_info already checked); append namespace.
   local ns; ns=$(kubectl config view --minify -o jsonpath='{..namespace}' 2>/dev/null)
-  echo " ⎈ ${ctx}${ns:+:$ns}"
+  local nsPart=""
+  [[ -n "$ns" ]] && nsPart="%{$fg[white]%}:${ns}"
+  echo " %{$fg_bold[blue]%}k8s:(%{$fg[magenta]%}${ctx}${nsPart}%{$fg[blue]%})%{$reset_color%} "
 }
-PROMPT+='$(kube_context_prompt)'
+PROMPT='$(kube_context_prompt)'"${PROMPT}"
 
 # ktx/kns — short aliases for kubectx/kubens, with tab-completion for
 # context/namespace names. Upstream ships real completion (ahmetb/kubectx

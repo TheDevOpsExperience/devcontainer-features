@@ -136,12 +136,14 @@ at the **end** of `.zshrc` (after oh-my-zsh and the theme), in three tiers:
 
 Prompt ownership stays mostly clean:
 
-- **Theme owns the left prompt** (`PROMPT`) — robbyrussell by default.
-- **Features default to the right prompt** (`RPROMPT`), appending rather than
-  replacing — `k8s` is the one documented exception, appending to the left
-  `PROMPT` instead because the kube-context it shows is high-consequence
-  (which cluster you're pointed at) and easy to miss on the right edge of a
-  narrow terminal.
+- **Theme sets the initial `PROMPT`/`RPROMPT`** — robbyrussell by default.
+- **Features extend either side** — no enforced default; a feature picks
+  whichever fits (and pre- or append) based on its own segment. e.g. `k8s`
+  prepends to `PROMPT` (first in the chain, ahead of the theme's own segments)
+  because the kube-context it shows is high-consequence (which cluster you're
+  pointed at) and easy to miss on the right edge of a narrow terminal. The
+  shared rule is just: extend what's already there, don't clobber it, and
+  ship an opt-out env.
 - **You win last** via project `*.zsh` (team) or `.overrides.zsh` (personal):
   set your own `PROMPT`/`RPROMPT`/theme there and it overrides everything, or
   silence one feature's segment with its opt-out env (e.g. `export K8S_HIDE_CONTEXT=1`).

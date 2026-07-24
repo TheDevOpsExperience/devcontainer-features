@@ -7,7 +7,7 @@
 # RPROMPT=''
 
 # Reuse a feature's prompt segment in your own prompt — e.g. the k8s feature
-# exposes kube_context_prompt (default: left PROMPT, echoes " ⎈ <context>:<namespace>").
+# exposes kube_context_prompt (default: left PROMPT, echoes " k8s:(<context>:<namespace>)").
 # Move it to the right instead:
 # PROMPT='%~ %# '
 # RPROMPT='$(kube_context_prompt)'
