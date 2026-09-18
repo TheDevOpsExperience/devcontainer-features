@@ -1,0 +1,25 @@
+{
+  "test": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "core": {},
+      "go": {}
+    },
+    "overrideFeatureInstallOrder": [
+      "./core"
+    ]
+  },
+  "pinned": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "core": {},
+      "go": {
+        "go_version": "1.26.5",
+        "golangci_lint_version": "2.12.2"
+      }
+    },
+    "overrideFeatureInstallOrder": [
+      "./core"
+    ]
+  }
+}

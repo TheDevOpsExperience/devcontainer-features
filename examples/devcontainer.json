@@ -39,6 +39,9 @@
       "skip_permissions": false
     },
     "ghcr.io/TheDevOpsExperience/devcontainer-features/gcloud:1": {},
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/go:1": {
+      "go_version": "latest" // also: golangci_lint_version
+    },
     // firebase installs via npm and its emulators need a Java runtime:
     "ghcr.io/devcontainers/features/java:1": {},
     "ghcr.io/TheDevOpsExperience/devcontainer-features/firebase:1": {}

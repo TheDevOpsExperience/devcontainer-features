@@ -32,6 +32,7 @@ A complete, copy-pasteable consumer setup (devcontainer.json, host.env, on-init 
 | `gcloud` | Google Cloud SDK (`gcloud`) via the official apt repository | — |
 | `firebase` | Firebase CLI (via npm) — emulators need a `java` feature | — |
 | `k8s` | kubectl, helm, kubectx, kubens — multi-arch | `kubectl_version`, `helm_version`, `kubectx_version` |
+| `go` | Go toolchain + golangci-lint — multi-arch, GOPATH/build/lint cache persisted; gopls/dlv install on demand into the persisted GOPATH | `go_version`, `golangci_lint_version` |
 
 See each feature's `src/<feature>/README.md` for full option details and notable behavior (e.g. the `claude` feature overwrites `~/.claude/CLAUDE.md` and `~/.claude/statusline.sh` on every container start).
 

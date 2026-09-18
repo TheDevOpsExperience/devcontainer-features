@@ -1,0 +1,51 @@
+{
+  "id": "go",
+  "version": "1.0.0",
+  "name": "Go",
+  "description": "Go toolchain plus golangci-lint — module/build cache and GOPATH persisted across rebuilds; gopls/delve install on demand into the persisted GOPATH",
+  "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/go",
+  "licenseURL": "https://github.com/TheDevOpsExperience/devcontainer-features/blob/main/LICENSE",
+  "options": {
+    "go_version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": [
+        "latest",
+        "1.27",
+        "1.26.5"
+      ],
+      "description": "Go version (without go prefix) or latest. Note Go's first release of a minor has no patch component — 1.27, not 1.27.0"
+    },
+    "golangci_lint_version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": [
+        "latest",
+        "2.12.2"
+      ],
+      "description": "golangci-lint version (without v prefix) or latest. latest is 2.x — v1 configs need migrating"
+    }
+  },
+  "containerEnv": {
+    "GOPATH": "/dc-volumes/go/gopath",
+    "GOCACHE": "/dc-volumes/go/cache/build",
+    "GOLANGCI_LINT_CACHE": "/dc-volumes/go/cache/golangci-lint"
+  },
+  "mounts": [
+    {
+      "source": "go-${localWorkspaceFolderBasename}",
+      "target": "/dc-volumes/go",
+      "type": "volume"
+    }
+  ],
+  "installsAfter": [
+    "ghcr.io/TheDevOpsExperience/devcontainer-features/core"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go"
+      ]
+    }
+  }
+}

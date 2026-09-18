@@ -100,8 +100,13 @@ Feature mounts use `${localWorkspaceFolderBasename}` suffix so volumes are autom
 | `gemini-<project>` | `/dc-volumes/gemini` | `~/.gemini` | `gemini`, `antigravity` (shared — both use `~/.gemini`; mutually exclusive) |
 | `codex-<project>` | `/dc-volumes/codex` | `~/.codex`; `~/.agents` → `/dc-volumes/codex/agents` subdir | `codex` |
 | `kube-<project>` | `/dc-volumes/kube` | `~/.kube` | `k8s` |
+| `go-<project>` | `/dc-volumes/go` | `~/go` → `gopath/` subdir (also `GOPATH`/`GOCACHE`/`GOLANGCI_LINT_CACHE` env; `cache/` subdir untouched by the symlink) | `go` |
 
 Mount targets are user-neutral `/dc-volumes/<name>` paths because feature mounts can't reference the remote user. Each feature's `install.sh` symlinks the corresponding home-dir path (for the user from `_REMOTE_USER`) to the volume, so the features work with any `remoteUser`.
+
+**Never install a feature-owned binary under a volume mount target.** `install.sh` runs at build time, when `/dc-volumes/<name>` is still an ordinary image directory. The named volume mounts over it at container create and seeds itself from the image *only while it's empty* — so on every later rebuild the image content at that path is shadowed by whatever the volume already holds. A tool installed there can never be updated by a rebuild (bumping a `*_version` option would silently keep the old binary), and its build artifacts get baked into every image layer for nothing. Install tools into the image (`/usr/local/bin`, `/usr/local/go`, …) and keep the volume for state the *user* generates at runtime — config, credentials, caches. `go` is the worked example: the toolchain and `golangci-lint` go to `/usr/local/go` and `/usr/local/bin`, while the runtime `GOPATH` (where the user's own `go install` writes) stays on the volume.
+
+**Corollary — a tool the volume already persists doesn't need installing at build time at all.** If an editor extension or the tool's own ecosystem already installs it into a persisted path, let it. `go` is again the example: `gopls`/`dlv` are *not* installed by the feature. The `golang.go` VS Code extension installs them on demand into `GOPATH/bin`, which is on the volume, so they survive rebuilds; the fetch needs only `proxy.golang.org`, already allowlisted. That drops two version options the editor manages better, and with them the pinned-`go_version`-vs-current-`gopls` conflict. Apply this only when all three hold: something else owns the install, the target path is persisted, and the runtime domains are already allowlisted. `golangci-lint` fails the third (GitHub hosts are build-time only) and wants CI-matching pins, so it stays baked in.
 
 ### Environment variables
 
@@ -203,6 +208,7 @@ The `install-package.sh` script validates package names and rejects flags.
 | `codex` | OpenAI Codex CLI (`codex`, native binary, no Node) — ChatGPT-account / API-key auth | `skip_permissions` |
 | `firebase` | Firebase CLI (via npm) — emulators need a `java` feature | — |
 | `k8s` | kubectl, helm, kubectx, kubens — multi-arch | `kubectl_version`, `helm_version`, `kubectx_version` |
+| `go` | Go toolchain + golangci-lint — multi-arch, GOPATH/build/lint cache persisted; gopls/dlv install on demand into the persisted GOPATH | `go_version`, `golangci_lint_version` |
 
 ### Notable option behavior
 
@@ -247,7 +253,8 @@ The `install-package.sh` script validates package names and rejects flags.
 - **`codex.skip_permissions`** (bool, default `false`) — aliases `codex` with `--yolo`.
 - The `codex` feature does **not** provision skills/plugins — users install them at runtime and they persist via two volume paths: `~/.codex` (auth, `config.toml`, plugin bundles) is mounted directly; `~/.agents` (USER-scope skills at `~/.agents/skills`, personal marketplaces at `~/.agents/plugins/marketplace.json`) is symlinked to `/dc-volumes/codex/agents`. Codex follows the symlink when scanning.
 - **`buildkit`** — only the `buildctl` client is installed; `buildkitd` runs as a host sidecar. Keep client/daemon versions in sync.
-- **`k8s` / `buildkit` versions** — `latest` is resolved without `api.github.com` (avoids unauthenticated rate limits): kubectl via `dl.k8s.io/release/stable.txt`, helm via `get.helm.sh/helm-latest-version`, kubectx via the GitHub `/releases/latest` redirect.
+- **`k8s` / `buildkit` / `go` versions** — `latest` is resolved without `api.github.com` (avoids unauthenticated rate limits): kubectl via `dl.k8s.io/release/stable.txt`, helm via `get.helm.sh/helm-latest-version`, kubectx and golangci-lint via the GitHub `/releases/latest` redirect, go via `go.dev/VERSION?m=text`. Go pins have no patch component on a minor's first release (`1.27`, not `1.27.0`).
+- **`go`** — both installed tools go into the **image** (`/usr/local/go` + `/usr/local/bin`), never under `/dc-volumes/go`; see the volume-shadowing rule above. The volume carries `GOPATH` (module cache + the user's own `go install`s), `GOCACHE` and `GOLANGCI_LINT_CACHE` only. `gopls`/`dlv` aren't installed by the feature — the recommended `golang.go` extension installs them on demand into `gopath/bin` on the volume. `golangci-lint` uses upstream's install script (fetched from `HEAD`) rather than `go install`, which upstream advises against; `latest` is 2.x, and a repo on a v1 config must migrate or pin.
 
 ## Publishing
 
