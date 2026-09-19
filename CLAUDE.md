@@ -198,7 +198,7 @@ The `install-package.sh` script validates package names and rejects flags.
 | Feature | What it adds | Options |
 |---------|-------------|---------|
 | `core` | Baseline packages, helper scripts + sudoers, shell/Oh My Zsh setup, SSH config setup, volume ownership fixes, idle-stop watchdog, oh-my-zsh plugin registry — **required by all others** | `idle_stop`, `idle_grace`, `zsh_plugins`, `git_prompt` |
-| `firewall` | iptables/ipset allowlist firewall, DNS capture, `allow-domain.sh`, `revoke-domain.sh`, `list-domains.sh` (+`--json`), `list-attempts.sh` (+`--json`), Firewall Monitor VS Code extension | `install_extension` |
+| `firewall` | iptables/ipset allowlist firewall, DNS capture, `allow-domain.sh`, `revoke-domain.sh`, `list-domains.sh` (+`--json`), `list-attempts.sh` (+`--json`), Firewall Monitor VS Code extension | `install_extension`, `enabled` |
 | `buildkit` | `buildctl` client + `docker-build` wrapper; connects to shared `buildkitd` sidecar | `version`, `daemon_host`, `daemon_port` |
 | `1password` | `op` CLI via apt repository + SA-token host-init | — |
 | `claude` | Claude Code CLI, pre-configured settings/CLAUDE.md/statusline | `skip_permissions` |
@@ -229,6 +229,21 @@ The `install-package.sh` script validates package names and rejects flags.
   "already installed, skip" branch) and re-adds it with
   `PROMPT+=' $(git_prompt_info)'` only when enabled — same pattern as k8s's
   own prompt segment. Regenerated every install.
+- **`firewall.enabled`** (bool, default `true`) — set `false` to skip
+  `init-firewall.sh`'s lockdown and the periodic IP-refresh daemon; all egress
+  flows normally. DNS capture (`capture-dns.sh`) still runs regardless — with
+  enforcement off, nothing pre-populates `/etc/hosts`, so every lookup is a real
+  DNS query and the capture log ends up recording every requested domain, not
+  just the denied/unknown ones. The `firewall-dir` marker file (normally written
+  by `init-firewall.sh`, read as a fallback by `list-domains.sh` /
+  `list-attempts.sh`) is now written by `capture-dns.sh` itself so it's still
+  correct when the lockdown step is skipped. The extension is mode-aware: it
+  checks the same install-time flag file
+  (`/usr/local/share/devcontainer/firewall/enabled`) at activation and hides the
+  **Allowlist**/**Ignored** panels when it's absent, retitling
+  **Attempted/Denied** to **Requested** and dropping its inline ignore/allow
+  buttons + circle-slash icon (plain globe instead) — with nothing enforced
+  there's nothing to decide, it's just a log.
 - **`firewall.install_extension`** (bool, default `true`) — installs the Firewall
   Monitor VS Code extension (allowlist TreeView, session-domain revoke, runtime
   allow-event toasts). The `.vsix` is built in CI (`release.yml` "Bundle

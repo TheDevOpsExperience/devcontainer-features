@@ -2,7 +2,7 @@
   "name": "firewall-monitor",
   "displayName": "Firewall Monitor",
   "description": "View the devcontainer firewall allowlist, revoke session domains, and get notified when a domain is allowed at runtime.",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "publisher": "thedevopsexperience",
   "license": "MIT",
   "engines": {
@@ -29,7 +29,8 @@
       "firewallMonitor": [
         {
           "id": "firewallAllowlist",
-          "name": "Allowlist"
+          "name": "Allowlist",
+          "when": "firewallMonitor.enforced"
         },
         {
           "id": "firewallAttempts",
@@ -37,7 +38,8 @@
         },
         {
           "id": "firewallIgnored",
-          "name": "Ignored"
+          "name": "Ignored",
+          "when": "firewallMonitor.enforced"
         }
       ]
     },

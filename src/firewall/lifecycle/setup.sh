@@ -9,16 +9,27 @@ mkdir -p "$FIREWALL_DIR"
 ALLOWED_DOMAINS_FILE="$FIREWALL_DIR/allowed-domains.conf"
 
 # ── Firewall ──────────────────────────────────────────────────────────────────
-echo "Setting up firewall..."
-sudo /usr/local/bin/init-firewall.sh "$ALLOWED_DOMAINS_FILE"
+# enabled=false (firewall.enabled option) skips lockdown + refresh entirely —
+# all outbound traffic flows normally. DNS capture below still runs either way,
+# so requested domains stay logged even with enforcement off.
+if [ -f /usr/local/share/devcontainer/firewall/enabled ]; then
+    echo "Setting up firewall..."
+    sudo /usr/local/bin/init-firewall.sh "$ALLOWED_DOMAINS_FILE"
 
-echo "→ Starting firewall IP refresh loop (every 30 min)..."
-# --daemon self-detaches into a --loop worker and returns; don't background here.
-# The script guards against a loop already running.
-sudo -n /usr/local/bin/refresh-firewall.sh --daemon "$ALLOWED_DOMAINS_FILE"
-echo "Firewall refresh started"
+    echo "→ Starting firewall IP refresh loop (every 30 min)..."
+    # --daemon self-detaches into a --loop worker and returns; don't background
+    # here. The script guards against a loop already running.
+    sudo -n /usr/local/bin/refresh-firewall.sh --daemon "$ALLOWED_DOMAINS_FILE"
+    echo "Firewall refresh started"
+else
+    echo "Firewall disabled (enabled=false) — all outbound traffic is allowed."
+    echo "DNS capture still runs, so requested domains are still logged (see below)."
+fi
 
 # ── DNS capture ───────────────────────────────────────────────────────────────
+# Always runs, enabled or not. With the firewall off, nothing pre-populates
+# /etc/hosts, so every domain does a real DNS lookup — the capture log ends up
+# recording ALL requested domains, not just the denied/unknown ones.
 ERRLOG="/tmp/capture-dns-start.log"
 echo "Starting DNS capture daemon..."
 # --daemon self-detaches into a --foreground worker and returns immediately; do

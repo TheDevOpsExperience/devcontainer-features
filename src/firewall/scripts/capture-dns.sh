@@ -40,6 +40,12 @@ for arg in "$@"; do
   esac
 done
 
+# Record the firewall dir even when init-firewall.sh didn't run (firewall
+# disabled) — list-domains.sh / list-attempts.sh fall back to this file, and
+# it's otherwise only written by init-firewall.sh. Runs as root (via sudo), so
+# the write always succeeds regardless of who owns the target path.
+echo "$FIREWALL_DIR" > /usr/local/share/devcontainer/firewall-dir 2>/dev/null || true
+
 CAPTURE_UID="${SUDO_UID:-1000}"
 RUN_LOG="/tmp/capture-dns-daemon.log"
 LOG="/var/log/firewall-dns.log"

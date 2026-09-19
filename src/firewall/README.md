@@ -2,6 +2,17 @@
 
 Requires the `core` feature. Installs `iptables`, `ipset`, `iproute2`, `dnsutils`, and `tcpdump` via `apt-get` — these are specialised system packages not provided by `core`.
 
+## Disabling enforcement (`enabled: false`)
+
+Set `enabled: false` to skip the allowlist lockdown (`init-firewall.sh`) and the
+periodic IP refresh entirely — all outbound traffic flows normally, as if the
+feature weren't installed. The DNS capture daemon still runs. With enforcement
+off, nothing pre-populates `/etc/hosts`, so every lookup does a real DNS query —
+the capture log ends up recording **every** domain requested, not just the
+denied/unknown ones as when enforcement is on. Useful for auditing what a
+container actually talks to before turning the allowlist on and populating
+`allowed-domains.conf`.
+
 ## Capabilities
 
 The feature declares `capAdd: [NET_ADMIN, NET_RAW]` in its `devcontainer-feature.json`, so the container gets the capabilities `iptables`/`ipset` (NET_ADMIN) and `tcpdump` (NET_RAW) need automatically. **You do not need `--cap-add` in `runArgs`** — adding the feature is enough. (Feature `capAdd` is merged into container creation and deduplicated, so a leftover `runArgs` entry is harmless but redundant.)
@@ -54,9 +65,14 @@ The setup scripts locate this dir via the workspace folder (lifecycle commands r
 ## Firewall Monitor (VS Code extension)
 
 Enabled by default (`install_extension`, set `false` to skip). Adds a **Firewall**
-view to the activity bar:
+view to the activity bar. With `enabled: false` (enforcement off), the
+**Allowlist** and **Ignored** panels are hidden, and **Attempted / Denied** is
+retitled **Requested** — a plain read-only log (no inline ignore/allow buttons,
+plain globe icon instead of circle-slash — there's nothing to decide when
+nothing's enforced). See [Disabling enforcement](#disabling-enforcement-enabled-false)
+above.
 
-- **Allowlist tree** grouped by tier (`session` / `persistent` / `feature`), from
+- **Allowlist tree** (enforcement on only) grouped by tier (`session` / `persistent` / `feature`), from
   `list-domains.sh --json`. **Session** rows have an inline **revoke** button
   (`revoke-domain.sh`); **persistent** (project) rows have an inline **remove**
   button (drops the domain from `allowed-domains.conf` + refresh). Feature rows
@@ -64,14 +80,16 @@ view to the activity bar:
   headers are always shown and carry an inline **+** button → enter a domain/IP to
   add it to that tier (session via `allow-domain.sh`, persistent via
   `allowed-domains.conf` + refresh).
-- **Ignored list** — from `.firewall/ignored-domains.conf`. Per row: **stop
-  ignoring** (remove the entry) and, for non-wildcard entries, **move to allowed**
-  (un-ignore + add to the persistent allowlist + refresh).
-- **Attempted / Denied list** — from `list-attempts.sh --json`: each captured
-  domain with attempt count + last-seen, sorted by frequency. Inline actions per
-  row: **ignore** (append `ignored-domains.conf`, exact or `*.parent`), **allow
-  (persistent)** (append `allowed-domains.conf` + refresh), **allow (this
-  session)** (`allow-domain.sh`).
+- **Ignored list** (enforcement on only) — from `.firewall/ignored-domains.conf`.
+  Per row: **stop ignoring** (remove the entry) and, for non-wildcard entries,
+  **move to allowed** (un-ignore + add to the persistent allowlist + refresh).
+- **Attempted / Denied list** (always shown; **Requested** when enforcement is
+  off) — from `list-attempts.sh --json`: each captured domain with attempt
+  count + last-seen, sorted by frequency. With enforcement on, inline actions
+  per row: **ignore** (append `ignored-domains.conf`, exact or `*.parent`),
+  **allow (persistent)** (append `allowed-domains.conf` + refresh), **allow
+  (this session)** (`allow-domain.sh`). With enforcement off it's read-only —
+  no buttons, plain globe icon instead of circle-slash.
 - **Toasts** — watches `/var/log/firewall-changes.log`; when a domain is allowed
   at runtime it pops a warning with a one-click **Revoke**.
 - **Open file** (title-bar button on every panel) — QuickPick to open the logs

@@ -59,6 +59,14 @@ if [ "${INSTALL_EXTENSION:-true}" = "true" ]; then
     fi
 fi
 
+# ── Enforcement toggle ─────────────────────────────────────────────────────────
+# Option only visible here at install time, not at postStart. Bake into a flag
+# file setup.sh reads to decide whether to run init-firewall.sh (lockdown) at
+# all. DNS capture always runs regardless — see setup.sh.
+if [ "${ENABLED:-true}" = "true" ]; then
+    touch /usr/local/share/devcontainer/firewall/enabled
+fi
+
 # Sudoers
 printf '%s ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh\n%s ALL=(root) NOPASSWD: /usr/local/bin/refresh-firewall.sh\n%s ALL=(root) NOPASSWD: /usr/local/bin/allow-domain.sh\n%s ALL=(root) NOPASSWD: /usr/local/bin/revoke-domain.sh\n%s ALL=(root) NOPASSWD: /usr/local/bin/capture-dns.sh\n' \
     "$USERNAME" "$USERNAME" "$USERNAME" "$USERNAME" "$USERNAME" \

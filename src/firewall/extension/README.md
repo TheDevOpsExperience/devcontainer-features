@@ -1,11 +1,23 @@
 # Firewall Monitor
 
 VS Code extension bundled with the `firewall` devcontainer feature. Adds a
-**Firewall** container to the activity bar with three panels for inspecting and
-managing the allowlist firewall — all without leaving the editor. The extension
-never needs root: privileged actions go through the sudoers-allowlisted firewall
-scripts, and config edits are written directly to the node-writable
+**Firewall** container to the activity bar for inspecting and managing the
+allowlist firewall — all without leaving the editor. The extension never needs
+root: privileged actions go through the sudoers-allowlisted firewall scripts,
+and config edits are written directly to the node-writable
 `.devcontainer/.firewall/` dir.
+
+**Panels depend on the `firewall.enabled` feature option** (checked once at
+activation via a flag file `install.sh` bakes in — see the feature's
+`enabled` option). With enforcement **on** (default), all three panels below
+show. With it **off**, **Allowlist** and **Ignored** are hidden — nothing is
+being enforced or filtered out of enforcement — and **Attempted / Denied** is
+retitled **Requested**: nothing pre-populates `/etc/hosts` when disabled, so
+every lookup is a real DNS query and the panel ends up showing every domain
+the container actually requested, not just the denied/unknown ones. It also
+loses its inline ignore/allow buttons and switches from the circle-slash
+"blocked" icon to a plain globe — with nothing enforced there's nothing to
+decide, it's just a log.
 
 ## Panels
 
@@ -21,14 +33,15 @@ Allowed domains from `list-domains.sh --json`, grouped by tier:
 The **Session** and **Persistent** group headers are always shown and carry an
 inline **+** button → enter a domain/IP/CIDR to add it to that tier.
 
-### Attempted / Denied
+### Attempted / Denied (or "Requested" with enforcement off)
 Undecided-denied **inbox**: deduplicated DNS lookups the sandboxed user
 attempted, from `list-attempts.sh --json` — each with attempt count + last-seen,
 sorted by frequency. (Allowed domains resolve via `/etc/hosts` without a DNS
-query, so the captured set is effectively the denied/unknown domains.) A domain
+query, so with enforcement on the captured set is effectively the
+denied/unknown domains; with it off, it's every domain requested.) A domain
 **drops out of this list once resolved** either way — allowed (now in the live
-allowlist → **Allowlist** view) or ignored (→ **Ignored** view). Inline actions
-per row:
+allowlist → **Allowlist** view) or ignored (→ **Ignored** view). Enforcement
+on only — inline actions per row:
 
 - **ignore** — append to `ignored-domains.conf` (choose exact or `*.parent`).
 - **allow (persistent)** — append to `allowed-domains.conf` + refresh.

@@ -1,6 +1,6 @@
 {
   "id": "firewall",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Firewall",
   "description": "iptables/ipset allowlist firewall with domain-based rules and DNS capture for domain discovery",
   "documentationURL": "https://github.com/TheDevOpsExperience/devcontainer-features/tree/main/src/firewall",
@@ -10,6 +10,11 @@
       "type": "boolean",
       "default": true,
       "description": "Install the Firewall Monitor VS Code extension (allowlist view, session-domain revoke, runtime allow-event toasts). The .vsix is bundled in the feature image and copied at build time; failure is non-fatal."
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enforce the allowlist firewall. Set false to allow all outbound traffic while still running the DNS capture daemon, so every requested domain is still logged (list-attempts.sh / firewall-dns.log) — useful for auditing what a container talks to before locking it down."
     }
   },
   "capAdd": [

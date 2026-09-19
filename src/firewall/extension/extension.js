@@ -1,12 +1,16 @@
 // Firewall Monitor — VS Code extension.
 //
-// Surfaces:
+// Surfaces (Allowlist/Ignored only when the firewall.enabled feature option is
+// on — see ENABLED_FLAG below; the Attempts view is always shown, retitled
+// "Requested" when it isn't):
 //   1. Allowlist TreeView — feature / persistent / session tiers from
 //      `list-domains.sh --json`; session rows get an inline revoke button.
-//   2. Attempted/Denied TreeView — deduped DNS attempts from
-//      `list-attempts.sh --json` (count + last-seen + first-seen); each row can be
-//      ignored, allowed persistently, or allowed for the session.
-//   3. Toast — watches /var/log/firewall-changes.log; on a new DOMAIN_ADDED /
+//   2. Attempted/Denied (or "Requested") TreeView — deduped DNS attempts from
+//      `list-attempts.sh --json` (count + last-seen + first-seen). With
+//      enforcement on, each row can be ignored, allowed persistently, or
+//      allowed for the session; with it off, it's a plain read-only log.
+//   3. Ignored TreeView — patterns in `.firewall/ignored-domains.conf`.
+//   4. Toast — watches /var/log/firewall-changes.log; on a new DOMAIN_ADDED /
 //      IP_ADDED line, shows a warning with a "Revoke" action.
 //
 // Privileged actions go through the sudoers-allowlisted firewall scripts; config
@@ -17,6 +21,14 @@ const vscode = require("vscode");
 const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+
+// Written by the firewall feature's install.sh only when enabled=true (the
+// firewall.enabled devcontainer-feature option). Its absence means enforcement
+// is off — the Allowlist/Ignored views are meaningless then (nothing is being
+// enforced or filtered-out-of-enforcement), so they're hidden and the Attempts
+// view is retitled: with nothing pre-populating /etc/hosts, it now captures
+// every domain requested, not just denied/unknown ones.
+const ENABLED_FLAG = "/usr/local/share/devcontainer/firewall/enabled";
 
 const LIST_DOMAINS = "/usr/local/bin/list-domains.sh";
 const LIST_ATTEMPTS = "/usr/local/bin/list-attempts.sh";
@@ -135,9 +147,13 @@ class AllowlistProvider {
   }
 }
 
-// ── Attempted / Denied view ───────────────────────────────────────────────────
+// ── Attempted / Denied (or "Requested", enforcement off) view ─────────────────
 class AttemptsProvider {
-  constructor() {
+  // enforced=false: plain read-only log (no ignore/allow — nothing is being
+  // denied, so there's nothing to decide), plain globe icon so it doesn't read
+  // as "blocked".
+  constructor(enforced) {
+    this.enforced = enforced;
     this._onDidChange = new vscode.EventEmitter();
     this.onDidChangeTreeData = this._onDidChange.event;
   }
@@ -161,11 +177,11 @@ class AttemptsProvider {
       return [];
     }
     // Only undecided rows reach here — list-attempts.sh drops anything already
-    // allowed (→ Allowlist view) or ignored (→ Ignored view). Every row is
-    // actionable: ignore / allow-persistent / allow-session.
+    // allowed (→ Allowlist view) or ignored (→ Ignored view). With enforcement
+    // on, every row is actionable: ignore / allow-persistent / allow-session.
     return rows.map((r) => {
       const item = new vscode.TreeItem(r.domain, vscode.TreeItemCollapsibleState.None);
-      item.contextValue = "attempt";
+      if (this.enforced) item.contextValue = "attempt"; // enables the inline buttons
       item.value = r.domain;
       const bits = [];
       if (r.count) bits.push(`×${r.count}`);
@@ -174,7 +190,7 @@ class AttemptsProvider {
       item.tooltip =
         `${r.domain}\nattempts: ${r.count}\nlast: ${r.last_seen || "—"}\n` +
         `first: ${r.first_seen || "—"}`;
-      item.iconPath = new vscode.ThemeIcon("circle-slash");
+      item.iconPath = new vscode.ThemeIcon(this.enforced ? "circle-slash" : "globe");
       return item;
     });
   }
@@ -521,48 +537,67 @@ function watchFile(file, cb, disposables, debounceMs = 500) {
 }
 
 function activate(context) {
-  const allow = new AllowlistProvider();
-  const attempts = new AttemptsProvider();
-  const ignored = new IgnoredProvider();
+  const enforced = fs.existsSync(ENABLED_FLAG);
+  vscode.commands.executeCommand("setContext", "firewallMonitor.enforced", enforced);
+
+  // Allow/Ignored only exist (and only get registered) when enforcement is on —
+  // the views are hidden via package.json's "when": "firewallMonitor.enforced",
+  // so there is nothing to drive them when it's off.
+  let allow, ignored;
+  const attempts = new AttemptsProvider(enforced);
+
   const refreshAll = () => {
-    allow.refresh();
+    if (allow) allow.refresh();
     attempts.refresh();
-    ignored.refresh();
+    if (ignored) ignored.refresh();
   };
   const onItem = (fn) => (item) => {
     if (item && item.value) fn(item.value).then(refreshAll);
   };
 
+  const attemptsView = vscode.window.createTreeView("firewallAttempts", { treeDataProvider: attempts });
+  attemptsView.title = enforced ? "Attempted / Denied" : "Requested";
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider("firewallAllowlist", allow),
-    vscode.window.registerTreeDataProvider("firewallAttempts", attempts),
-    vscode.window.registerTreeDataProvider("firewallIgnored", ignored),
-    vscode.commands.registerCommand("firewall.refresh", () => allow.refresh()),
+    attemptsView,
     vscode.commands.registerCommand("firewall.refreshAttempts", () => attempts.refresh()),
-    vscode.commands.registerCommand("firewall.refreshIgnored", () => ignored.refresh()),
-    vscode.commands.registerCommand("firewall.revoke", onItem(revoke)),
-    vscode.commands.registerCommand("firewall.ignore", onItem(ignoreDomain)),
-    vscode.commands.registerCommand("firewall.allowPersistent", onItem(allowPersistent)),
-    vscode.commands.registerCommand("firewall.allowTemp", onItem(allowTemp)),
-    vscode.commands.registerCommand("firewall.removePersistent", onItem(removePersistent)),
-    vscode.commands.registerCommand("firewall.unignore", onItem(unignore)),
-    vscode.commands.registerCommand("firewall.allowFromIgnored", onItem(allowFromIgnored)),
-    vscode.commands.registerCommand("firewall.openFile", () => openFile()),
-    vscode.commands.registerCommand("firewall.addSession", () => addSession().then(refreshAll)),
-    vscode.commands.registerCommand("firewall.addPersistent", () => addPersistent().then(refreshAll))
+    vscode.commands.registerCommand("firewall.openFile", () => openFile())
   );
+
+  if (enforced) {
+    allow = new AllowlistProvider();
+    ignored = new IgnoredProvider();
+    context.subscriptions.push(
+      vscode.window.registerTreeDataProvider("firewallAllowlist", allow),
+      vscode.window.registerTreeDataProvider("firewallIgnored", ignored),
+      vscode.commands.registerCommand("firewall.refresh", () => allow.refresh()),
+      vscode.commands.registerCommand("firewall.refreshIgnored", () => ignored.refresh()),
+      vscode.commands.registerCommand("firewall.revoke", onItem(revoke)),
+      // Attempts/Denied row actions — only meaningful with enforcement on
+      // (nothing is denied to ignore/allow when it's off), and rows only carry
+      // the "attempt" contextValue that enables these buttons in that case too.
+      vscode.commands.registerCommand("firewall.ignore", onItem(ignoreDomain)),
+      vscode.commands.registerCommand("firewall.allowPersistent", onItem(allowPersistent)),
+      vscode.commands.registerCommand("firewall.allowTemp", onItem(allowTemp)),
+      vscode.commands.registerCommand("firewall.removePersistent", onItem(removePersistent)),
+      vscode.commands.registerCommand("firewall.unignore", onItem(unignore)),
+      vscode.commands.registerCommand("firewall.allowFromIgnored", onItem(allowFromIgnored)),
+      vscode.commands.registerCommand("firewall.addSession", () => addSession().then(refreshAll)),
+      vscode.commands.registerCommand("firewall.addPersistent", () => addPersistent().then(refreshAll))
+    );
+  }
 
   watchChangesLog(refreshAll, context.subscriptions);
   watchFile(SESSION_DNS_LOG, () => attempts.refresh(), context.subscriptions);
 
   // Config edits (ours or the user's) reflect immediately in the views. Both
-  // files also gate the Attempts inbox (allowed/ignored domains drop out of it),
-  // so refresh attempts on either change too — covers external edits the
+  // files also gate the Attempts/Requested inbox (allowed/ignored domains drop
+  // out of it — list-attempts.sh applies this regardless of enforcement), so
+  // refresh attempts on either change too — covers external edits the
   // click-path refreshAll wouldn't catch.
   const dir = firewallConfigDir();
   if (dir) {
-    watchFile(path.join(dir, "ignored-domains.conf"), () => { ignored.refresh(); attempts.refresh(); }, context.subscriptions);
-    watchFile(path.join(dir, "allowed-domains.conf"), () => { allow.refresh(); attempts.refresh(); }, context.subscriptions);
+    watchFile(path.join(dir, "ignored-domains.conf"), () => { if (ignored) ignored.refresh(); attempts.refresh(); }, context.subscriptions);
+    watchFile(path.join(dir, "allowed-domains.conf"), () => { if (allow) allow.refresh(); attempts.refresh(); }, context.subscriptions);
   }
 }
 
